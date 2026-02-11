@@ -294,6 +294,48 @@
         setTab(bulkTab); setBulkText(""); setBulkPreview([]); setShowBulk(false);
       };
 
+      // Export library as JSON file
+      const exportLibrary = () => {
+        const data = JSON.stringify(books, null, 2);
+        const blob = new Blob([data], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `bookshelf-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setToast({ text: "Library exported successfully", type: "success" });
+      };
+
+      // Import library from JSON file
+      const importLibrary = () => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json";
+        input.onchange = (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            try {
+              const parsed = JSON.parse(ev.target.result);
+              if (parsed.reading && parsed.want && parsed.finished) {
+                setBooks(parsed);
+                setToast({ text: `Imported ${parsed.reading.length + parsed.want.length + parsed.finished.length} books`, type: "success" });
+              } else {
+                setToast({ text: "Invalid backup file", type: "info" });
+              }
+            } catch (err) {
+              setToast({ text: "Could not read file", type: "info" });
+            }
+          };
+          reader.readAsText(file);
+        };
+        input.click();
+      };
+
       const moveBook = (bookId, fromTab, toTab) => {
         const book = books[fromTab].find(b => b.id === bookId);
         if (!book) return;
@@ -403,6 +445,9 @@
               <span style={S.statItem}><span style={S.statNum}>{books.finished.length}</span> finished</span>
               <span style={S.statDivider}>·</span>
               <span style={S.statItem}><span style={S.statNum}>{books.want.length}</span> queued</span>
+              <span style={S.statDivider}>·</span>
+              <button style={S.dataBtn} onClick={exportLibrary} title="Export backup">↓ Export</button>
+              <button style={S.dataBtn} onClick={importLibrary} title="Import backup">↑ Import</button>
             </div>
           </div>
 
@@ -733,6 +778,7 @@
       statItem: { display: "flex", gap: 4, alignItems: "center" },
       statNum: { color: "#57534E", fontWeight: 600 },
       statDivider: { color: "#D6D3D1" },
+      dataBtn: { background: "none", border: "1px solid #E7E2DC", borderRadius: 6, color: "#A8A29E", fontSize: 11, fontFamily: "'Outfit', sans-serif", fontWeight: 500, cursor: "pointer", padding: "3px 8px", transition: "all 0.15s", whiteSpace: "nowrap" },
       searchWrap: { position: "relative", marginBottom: 16, display: "flex", gap: 8, alignItems: "center" },
       searchIcon: { position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", fontSize: 16, color: "#A8A29E", pointerEvents: "none" },
       searchInput: { flex: 1, padding: "11px 40px 11px 40px", background: "#FFFFFF", border: "1px solid #E7E2DC", borderRadius: 10, color: "#1C1917", fontSize: 14, fontFamily: "'Outfit', sans-serif", transition: "border-color 0.2s" },
