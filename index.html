@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="bookshelf" />
+  <meta name="theme-color" content="#F7F5F2" />
+  <title>bookshelf</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; }
+    body { background: #F7F5F2; font-family: 'Outfit', sans-serif; -webkit-font-smoothing: antialiased; }
+    input::placeholder { color: #A8A29E; }
+    textarea::placeholder { color: #A8A29E; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #D4CFC8 !important; }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // ── IndexedDB Storage Helper ──
+    const DB_NAME = "bookshelf-db";
+    const STORE_NAME = "data";
+    const openDB = () => new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(STORE_NAME);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    const dbGet = async (key) => {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readonly");
+        const req = tx.objectStore(STORE_NAME).get(key);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    };
+    const dbSet = async (key, value) => {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        tx.objectStore(STORE_NAME).put(value, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    };
+
+    // ── Constants ──
+    const FORMATS = ["Kindle", "Hardcopy", "Audiobook"];
+    const PLATFORMS = { Kindle: ["Kindle"], Hardcopy: ["IRL"], Audiobook: ["Libby", "Spotify"] };
+    const TABS = [
+      { id: "reading", label: "Currently Reading", icon: "📖" },
+      { id: "want", label: "Want to Read", icon: "🔖" },
+      { id: "finished", label: "Finished", icon: "✓" },
+    ];
+    const FORMAT_ICONS = { Kindle: "⚡", Hardcopy: "📕", Audiobook: "🎧" };
+    const PLATFORM_COLORS = { Kindle: "#D97706", IRL: "#8B7355", Libby: "#DC2626", Spotify: "#16A34A" };
+    const initialBooks = { reading: [], want: [], finished: [] };
+
+    function BookTracker() {
+      const [tab, setTab] = useState("reading");
+      const [books, setBooks] = useState(initialBooks);
+      const [booksLoaded, setBooksLoaded] = useState(false);
+      const [showAdd, setShowAdd] = useState(false);
+      const [search, setSearch] = useState("");
+      const [title, setTitle] = useState("");
+      const [author, setAuthor] = useState("");
+      const [format, setFormat] = useState("Kindle");
+      const [platform, setPlatform] = useState("Kindle");
+      const [progress, setProgress] = useState("");
+      const [dateStarted, setDateStarted] = useState(() => new Date().toISOString().slice(0, 10));
+      const [editingId, setEditingId] = useState(null);
+      const [confirmDelete, setConfirmDelete] = useState(null);
+      const [showBulk, setShowBulk] = useState(false);
+      const [sortBy, setSortBy] = useState("date-desc");
+      const [groupBy, setGroupBy] = useState("none");
+      const [bulkText, setBulkText] = useState("");
+      const [bulkFormat, setBulkFormat] = useState("Kindle");
+      const [bulkPlatform, setBulkPlatform] = useState("Kindle");
+      const [bulkTab, setBulkTab] = useState("reading");
+      const [bulkPreview, setBulkPreview] = useState([]);
+      const [swipeStates, setSwipeStates] = useState({});
+      const [toast, setToast] = useState(null);
+      const [urlParsed, setUrlParsed] = useState(null);
+      const touchRef = useRef({});
+      const inputRef = useRef(null);
+      const bulkRef = useRef(null);
+
+      // Load from IndexedDB
+      useEffect(() => {
+        (async () => {
+          try {
+            const data = await dbGet("shelf-books");
+            if (data && data.reading && data.want && data.finished) setBooks(data);
+          } catch (e) {}
+          setBooksLoaded(true);
+        })();
+      }, []);
+
+      // Save to IndexedDB
+      useEffect(() => {
+        if (!booksLoaded) return;
+        dbSet("shelf-books", books).catch(e => console.error("Save failed:", e));
+      }, [books, booksLoaded]);
+
+      useEffect(() => { if (showAdd && inputRef.current) inputRef.current.focus(); }, [showAdd]);
+      useEffect(() => { if (showBulk && bulkRef.current) bulkRef.current.focus(); }, [showBulk]);
+      useEffect(() => { setPlatform(PLATFORMS[format][0]); }, [format]);
+      useEffect(() => { setBulkPlatform(PLATFORMS[bulkFormat][0]); }, [bulkFormat]);
+      useEffect(() => { if (toast) { const t = setTimeout(() => setToast(null), 2500); return () => clearTimeout(t); } }, [toast]);
+
+      // URL detection
+      useEffect(() => {
+        const s = search.trim();
+        if (!s) { setUrlParsed(null); return; }
+        const amazonMatch = s.match(/amazon\.com.*?\/dp\/[A-Z0-9]+/i) || s.match(/amazon\.com.*?\/([^\/\?]+)/i);
+        const goodreadsMatch = s.match(/goodreads\.com\/book\/show\/[\d]+-?([\w-]+)?/i);
+        if (amazonMatch || goodreadsMatch) {
+          let extracted = "";
+          if (goodreadsMatch && goodreadsMatch[1]) {
+            extracted = goodreadsMatch[1].replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+          } else if (amazonMatch) {
+            const pathMatch = s.match(/\/([^\/]+)\/dp\//);
+            if (pathMatch) extracted = decodeURIComponent(pathMatch[1]).replace(/[-_+]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+          }
+          setUrlParsed(extracted || "Book from link");
+        } else { setUrlParsed(null); }
+      }, [search]);
+
+      // Swipe handlers
+      const handleTouchStart = (id, e) => { touchRef.current[id] = { startX: e.touches[0].clientX, startY: e.touches[0].clientY }; };
+      const handleTouchMove = (id, e) => {
+        if (!touchRef.current[id]) return;
+        const dx = e.touches[0].clientX - touchRef.current[id].startX;
+        const dy = Math.abs(e.touches[0].clientY - touchRef.current[id].startY);
+        if (dy > 30) { touchRef.current[id] = null; setSwipeStates(p => ({...p, [id]: 0})); return; }
+        if (dx < 0) setSwipeStates(p => ({...p, [id]: Math.min(Math.abs(dx), 120)}));
+      };
+      const handleTouchEnd = (id, book) => {
+        if ((swipeStates[id] || 0) > 70) quickSaveToWant(book.title, book.author || "");
+        touchRef.current[id] = null;
+        setSwipeStates(p => ({...p, [id]: 0}));
+      };
+      const handleMouseDown = (id, e) => { touchRef.current[id] = { startX: e.clientX, mouseDown: true }; };
+      const handleMouseMove = (id, e) => {
+        if (!touchRef.current[id]?.mouseDown) return;
+        const dx = e.clientX - touchRef.current[id].startX;
+        if (dx < 0) setSwipeStates(p => ({...p, [id]: Math.min(Math.abs(dx), 120)}));
+      };
+      const handleMouseUp = (id, book) => {
+        if ((swipeStates[id] || 0) > 70) quickSaveToWant(book.title, book.author || "");
+        if (touchRef.current[id]) touchRef.current[id].mouseDown = false;
+        setSwipeStates(p => ({...p, [id]: 0}));
+      };
+
+      const quickSaveToWant = (bookTitle, bookAuthor) => {
+        if (!bookTitle.trim()) return;
+        const allBooks = [...books.reading, ...books.want, ...books.finished];
+        if (allBooks.some(b => b.title.toLowerCase() === bookTitle.trim().toLowerCase())) {
+          setToast({ text: `"${bookTitle}" is already in your library`, type: "info" }); return;
+        }
+        const newBook = {
+          id: Date.now(), title: bookTitle.trim(), author: bookAuthor.trim(),
+          format: "Kindle", platform: "Kindle", progress: "",
+          dateStarted: new Date().toISOString().slice(0, 10),
+          addedAt: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        };
+        setBooks(prev => ({ ...prev, want: [...prev.want, newBook] }));
+        setToast({ text: `"${bookTitle}" saved to Want to Read`, type: "success" });
+        setSearch(""); setUrlParsed(null);
+      };
+
+      const addBook = () => {
+        if (!title.trim()) return;
+        const newBook = {
+          id: Date.now(), title: title.trim(), author: author.trim(),
+          format, platform, progress: progress.trim(), dateStarted,
+          addedAt: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        };
+        if (editingId) {
+          setBooks(prev => {
+            const updated = {};
+            for (const key in prev) updated[key] = prev[key].map(b => b.id === editingId ? { ...newBook, id: editingId, addedAt: b.addedAt } : b);
+            return updated;
+          });
+          setEditingId(null);
+        } else {
+          setBooks(prev => ({ ...prev, [tab]: [...prev[tab], newBook] }));
+        }
+        resetForm();
+      };
+
+      const resetForm = () => {
+        setTitle(""); setAuthor(""); setFormat("Kindle"); setPlatform("Kindle");
+        setProgress(""); setDateStarted(new Date().toISOString().slice(0, 10));
+        setShowAdd(false); setEditingId(null);
+      };
+
+      const parseBulkText = (text) => {
+        const lines = text.split("\n").map(l => l.replace(/^\*\s*/, "").trim()).filter(l => l);
+        const isJunk = (line) => {
+          const l = line.trim().toLowerCase();
+          if (!l) return true;
+          if (/^\d+$/.test(l)) return true;
+          if (/^in\s*\d*$/i.test(l)) return true;
+          if (/^(device|read|sample|loan|subscription|downloaded|delete|more actions|update available)$/i.test(l)) return true;
+          if (/^deliver or remove/i.test(l)) return true;
+          if (/^return this/i.test(l)) return true;
+          if (/^add to collection/i.test(l)) return true;
+          if (l.length <= 2 && !/[a-z]{2}/i.test(l)) return true;
+          return false;
+        };
+        const cleaned = lines.filter(l => !isJunk(l));
+        const hasKindleFormat = cleaned.some(l => /^Acquired on\s/i.test(l));
+
+        if (hasKindleFormat) {
+          const result = [];
+          let i = 0;
+          while (i < cleaned.length) {
+            const line = cleaned[i];
+            if (/^Acquired on\s/i.test(line)) { i++; continue; }
+            const titleLine = line;
+            let auth = "", ds = "";
+            if (i + 1 < cleaned.length) {
+              if (/^Acquired on\s/i.test(cleaned[i + 1])) {
+                const dm = cleaned[i + 1].match(/Acquired on\s+(.+)/i);
+                if (dm) { const p = new Date(dm[1]); if (!isNaN(p)) ds = p.toISOString().slice(0, 10); }
+                i += 2;
+              } else {
+                auth = cleaned[i + 1];
+                if (i + 2 < cleaned.length && /^Acquired on\s/i.test(cleaned[i + 2])) {
+                  const dm = cleaned[i + 2].match(/Acquired on\s+(.+)/i);
+                  if (dm) { const p = new Date(dm[1]); if (!isNaN(p)) ds = p.toISOString().slice(0, 10); }
+                  i += 3;
+                } else { i += 2; }
+              }
+            } else { i++; }
+            let t = titleLine.replace(/^["'\u201c\u201d]|["'\u201c\u201d]$/g, "").trim();
+            auth = auth.replace(/^["'\u201c\u201d]|["'\u201c\u201d]$/g, "").trim();
+            if (t) result.push({ title: t, author: auth, dateStarted: ds || new Date().toISOString().slice(0, 10) });
+          }
+          return result;
+        }
+
+        return cleaned.map(line => {
+          const trimmed = line.replace(/^[\d.\-\u2022*)\]\s]+/, "").trim();
+          let t = trimmed, a = "";
+          const byM = trimmed.match(/^(.+?)\s+by\s+(.+)$/i);
+          const dashM = trimmed.match(/^(.+?)\s+[-\u2013\u2014]\s+(.+)$/);
+          const commaM = trimmed.match(/^(.+?),\s+(.+)$/);
+          if (byM) { t = byM[1].trim(); a = byM[2].trim(); }
+          else if (dashM) { t = dashM[1].trim(); a = dashM[2].trim(); }
+          else if (commaM) { t = commaM[1].trim(); a = commaM[2].trim(); }
+          t = t.replace(/^["'\u201c\u201d]|["'\u201c\u201d]$/g, "").trim();
+          a = a.replace(/^["'\u201c\u201d]|["'\u201c\u201d]$/g, "").trim();
+          return { title: t, author: a, dateStarted: new Date().toISOString().slice(0, 10) };
+        });
+      };
+
+      useEffect(() => { setBulkPreview(bulkText.trim() ? parseBulkText(bulkText) : []); }, [bulkText]);
+
+      const submitBulk = () => {
+        if (bulkPreview.length === 0) return;
+        const now = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+        const newBooks = bulkPreview.map((b, i) => ({
+          id: Date.now() + i, title: b.title, author: b.author,
+          format: bulkFormat, platform: bulkPlatform, progress: "",
+          dateStarted: b.dateStarted || new Date().toISOString().slice(0, 10), addedAt: now,
+        }));
+        setBooks(prev => ({ ...prev, [bulkTab]: [...prev[bulkTab], ...newBooks] }));
+        setTab(bulkTab); setBulkText(""); setBulkPreview([]); setShowBulk(false);
+      };
+
+      const moveBook = (bookId, fromTab, toTab) => {
+        const book = books[fromTab].find(b => b.id === bookId);
+        if (!book) return;
+        setBooks(prev => ({
+          ...prev,
+          [fromTab]: prev[fromTab].filter(b => b.id !== bookId),
+          [toTab]: [...prev[toTab], { ...book, movedAt: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) }],
+        }));
+      };
+
+      const deleteBook = (bookId, fromTab) => {
+        setBooks(prev => ({ ...prev, [fromTab]: prev[fromTab].filter(b => b.id !== bookId) }));
+        setConfirmDelete(null);
+      };
+
+      const editBook = (book) => {
+        setTitle(book.title); setAuthor(book.author); setFormat(book.format);
+        setPlatform(book.platform); setProgress(book.progress || "");
+        setDateStarted(book.dateStarted || new Date().toISOString().slice(0, 10));
+        setEditingId(book.id); setShowAdd(true);
+      };
+
+      const allBooks = [...books.reading, ...books.want, ...books.finished];
+      const searchResults = search.trim()
+        ? allBooks.filter(b => b.title.toLowerCase().includes(search.toLowerCase()) || b.author.toLowerCase().includes(search.toLowerCase()))
+        : [];
+
+      const getBookStatus = (book) => {
+        if (books.reading.find(b => b.id === book.id)) return "Currently Reading";
+        if (books.want.find(b => b.id === book.id)) return "Want to Read";
+        if (books.finished.find(b => b.id === book.id)) return "Finished";
+        return "";
+      };
+
+      const filteredBooks = books[tab].filter(b =>
+        !search.trim() || b.title.toLowerCase().includes(search.toLowerCase()) || b.author.toLowerCase().includes(search.toLowerCase())
+      );
+
+      const sortedBooks = [...filteredBooks].sort((a, b) => {
+        switch (sortBy) {
+          case "title-asc": return a.title.localeCompare(b.title);
+          case "title-desc": return b.title.localeCompare(a.title);
+          case "author-asc": return (a.author || "").localeCompare(b.author || "");
+          case "author-desc": return (b.author || "").localeCompare(a.author || "");
+          case "date-asc": return (a.dateStarted || "").localeCompare(b.dateStarted || "");
+          case "date-desc": return (b.dateStarted || "").localeCompare(a.dateStarted || "");
+          default: return 0;
+        }
+      });
+
+      const groupedBooks = (() => {
+        if (groupBy === "none") return null;
+        const groups = {};
+        sortedBooks.forEach(book => {
+          const key = groupBy === "author" ? (book.author || "Unknown Author") : (book.format || "Unknown");
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(book);
+        });
+        return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
+      })();
+
+      const renderBookCard = (book) => (
+        React.createElement(React.Fragment, null,
+          React.createElement("div", { style: S.bookTop },
+            React.createElement("div", { style: S.bookInfo },
+              React.createElement("div", { style: S.bookTitle }, book.title),
+              book.author && React.createElement("div", { style: S.bookAuthor }, book.author)
+            ),
+            React.createElement("div", { style: S.bookActions },
+              React.createElement("button", { style: S.iconBtn, onClick: () => editBook(book), title: "Edit" }, "✎"),
+              confirmDelete === book.id
+                ? React.createElement("span", { style: S.confirmRow },
+                    React.createElement("button", { style: { ...S.iconBtn, color: "#DC2626" }, onClick: () => deleteBook(book.id, tab) }, "Yes"),
+                    React.createElement("button", { style: S.iconBtn, onClick: () => setConfirmDelete(null) }, "No")
+                  )
+                : React.createElement("button", { style: { ...S.iconBtn, color: "#A8A29E" }, onClick: () => setConfirmDelete(book.id), title: "Delete" }, "×")
+            )
+          ),
+          React.createElement("div", { style: S.bookMeta },
+            React.createElement("span", { style: { ...S.platformTag, background: PLATFORM_COLORS[book.platform] + "15", color: PLATFORM_COLORS[book.platform], borderColor: PLATFORM_COLORS[book.platform] + "30" } },
+              FORMAT_ICONS[book.format] + " " + book.platform
+            ),
+            book.progress && React.createElement("span", { style: S.progressTag }, "↗ " + book.progress),
+            book.dateStarted && React.createElement("span", { style: S.dateTag },
+              (tab === "want" ? "Saved " : "Started ") + new Date(book.dateStarted + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+            )
+          ),
+          React.createElement("div", { style: S.moveRow },
+            tab !== "reading" && React.createElement("button", { style: S.moveBtn, onClick: () => moveBook(book.id, tab, "reading") }, "Move to Reading"),
+            tab !== "want" && React.createElement("button", { style: S.moveBtn, onClick: () => moveBook(book.id, tab, "want") }, "Move to Want"),
+            tab !== "finished" && React.createElement("button", { style: { ...S.moveBtn, ...S.moveBtnFinish }, onClick: () => moveBook(book.id, tab, "finished") }, "✓ Mark Finished")
+          )
+        )
+      );
+
+      // ── JSX Return ──
+      return (
+        <div style={S.container}>
+          {/* Header */}
+          <div style={S.header}>
+            <div style={S.headerLeft}>
+              <h1 style={S.logo}>bookshelf</h1>
+            </div>
+            <div style={S.stats}>
+              <span style={S.statItem}><span style={S.statNum}>{books.reading.length}</span> active</span>
+              <span style={S.statDivider}>·</span>
+              <span style={S.statItem}><span style={S.statNum}>{books.finished.length}</span> finished</span>
+              <span style={S.statDivider}>·</span>
+              <span style={S.statItem}><span style={S.statNum}>{books.want.length}</span> queued</span>
+            </div>
+          </div>
+
+          {/* Search */}
+          <div style={S.searchWrap}>
+            <span style={S.searchIcon}>⌕</span>
+            <input style={S.searchInput} placeholder="Search your library or check if you've read something…" value={search} onChange={e => setSearch(e.target.value)} />
+            {search && <button style={S.clearBtn} onClick={() => setSearch("")}>×</button>}
+            <button style={S.bulkBtn} onClick={() => setShowBulk(true)} title="Bulk import">⤓ Import</button>
+          </div>
+
+          {/* Search results */}
+          {search.trim() && (
+            <div style={S.searchResults}>
+              {!urlParsed && (() => {
+                const q = search.toLowerCase();
+                const finishedMatch = books.finished.filter(b => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q));
+                const readingMatch = books.reading.filter(b => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q));
+                const wantMatch = books.want.filter(b => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q));
+                const hasAny = finishedMatch.length > 0 || readingMatch.length > 0 || wantMatch.length > 0;
+
+                if (finishedMatch.length > 0) return (
+                  <div style={S.readCheckBanner}>
+                    <div style={S.readCheckIcon}>✓</div>
+                    <div style={S.readCheckContent}>
+                      <div style={S.readCheckTitle}>Yes, you've read {finishedMatch.length === 1 ? "this" : "these"}!</div>
+                      <div style={S.readCheckBooks}>{finishedMatch.map(b => <span key={b.id} style={S.readCheckBookName}>{b.title}{b.author ? ` — ${b.author}` : ""}</span>)}</div>
+                    </div>
+                  </div>
+                );
+                if (readingMatch.length > 0) return (
+                  <div style={{...S.readCheckBanner, background: "#FFF8ED", borderColor: "#F0DFB8"}}>
+                    <div style={{...S.readCheckIcon, background: "#FFF0D4", color: "#B8860B"}}>📖</div>
+                    <div style={S.readCheckContent}>
+                      <div style={{...S.readCheckTitle, color: "#B8860B"}}>You're reading {readingMatch.length === 1 ? "this" : "these"} now</div>
+                      <div style={S.readCheckBooks}>{readingMatch.map(b => <span key={b.id} style={S.readCheckBookName}>{b.title}{b.progress ? ` (${b.progress})` : ""}</span>)}</div>
+                    </div>
+                  </div>
+                );
+                if (wantMatch.length > 0) return (
+                  <div style={{...S.readCheckBanner, background: "#F0F4FF", borderColor: "#D0DBFF"}}>
+                    <div style={{...S.readCheckIcon, background: "#E0E8FF", color: "#4A6FA5"}}>🔖</div>
+                    <div style={S.readCheckContent}>
+                      <div style={{...S.readCheckTitle, color: "#4A6FA5"}}>On your Want to Read list</div>
+                      <div style={S.readCheckBooks}>{wantMatch.map(b => <span key={b.id} style={S.readCheckBookName}>{b.title}{b.author ? ` — ${b.author}` : ""}</span>)}</div>
+                    </div>
+                  </div>
+                );
+                if (!hasAny && search.trim().length >= 2) return (
+                  <div style={{...S.readCheckBanner, background: "#F5F3F0", borderColor: "#E5E0DA"}}>
+                    <div style={{...S.readCheckIcon, background: "#EBE7E2", color: "#A8A29E"}}>✗</div>
+                    <div style={S.readCheckContent}>
+                      <div style={{...S.readCheckTitle, color: "#78716C"}}>Not in your library</div>
+                      <div style={{...S.readCheckBooks, color: "#A8A29E"}}>No match for "{search}" in any of your lists</div>
+                    </div>
+                  </div>
+                );
+                return null;
+              })()}
+
+              {urlParsed && (
+                <div style={S.urlCard}>
+                  <div style={S.urlCardIcon}>🔗</div>
+                  <div style={S.urlCardContent}>
+                    <div style={S.urlCardLabel}>Link detected</div>
+                    <div style={S.urlCardTitle}>{urlParsed}</div>
+                  </div>
+                  <button style={S.urlSaveBtn} onClick={() => quickSaveToWant(urlParsed, "")}>+ Save</button>
+                </div>
+              )}
+
+              {!urlParsed && searchResults.length === 0 ? (
+                <div style={S.noResults}>
+                  <span style={{ fontSize: 20 }}>🔍</span>
+                  <span>No books found matching "{search}"</span>
+                  <button style={S.quickAddBtn} onClick={() => quickSaveToWant(search, "")}>
+                    🔖 Quick save "{search.length > 30 ? search.slice(0, 30) + "…" : search}" to Want to Read
+                  </button>
+                </div>
+              ) : !urlParsed && (
+                <>
+                  <div style={S.swipeHint}>← swipe left to save to Want to Read</div>
+                  {searchResults.map(book => {
+                    const swipeX = swipeStates[book.id] || 0;
+                    const isRevealed = swipeX > 70;
+                    return (
+                      <div key={book.id} style={S.swipeContainer}>
+                        <div style={{...S.swipeAction, opacity: Math.min(swipeX / 70, 1), background: isRevealed ? "#D4EDDA" : "#E8F5E9"}}>
+                          <span style={{ fontSize: isRevealed ? 18 : 14, transition: "font-size 0.15s" }}>{isRevealed ? "🔖 Release to save" : "🔖"}</span>
+                        </div>
+                        <div
+                          style={{...S.searchResultItem, transform: `translateX(${-swipeX}px)`, transition: swipeX === 0 ? "transform 0.3s ease" : "none"}}
+                          onTouchStart={e => handleTouchStart(book.id, e)} onTouchMove={e => handleTouchMove(book.id, e)} onTouchEnd={() => handleTouchEnd(book.id, book)}
+                          onMouseDown={e => handleMouseDown(book.id, e)} onMouseMove={e => handleMouseMove(book.id, e)} onMouseUp={() => handleMouseUp(book.id, book)}
+                          onMouseLeave={() => { if (touchRef.current[book.id]?.mouseDown) handleMouseUp(book.id, book); }}
+                        >
+                          <div style={S.searchResultLeft}>
+                            <span style={S.formatBadge}>{FORMAT_ICONS[book.format]}</span>
+                            <div>
+                              <div style={S.searchResultTitle}>{book.title}</div>
+                              <div style={S.searchResultAuthor}>{book.author}</div>
+                            </div>
+                          </div>
+                          <div style={{
+                            ...S.statusBadge,
+                            background: getBookStatus(book) === "Finished" ? "#ECFDF5" : getBookStatus(book) === "Currently Reading" ? "#FFF8ED" : "#F0F4FF",
+                            color: getBookStatus(book) === "Finished" ? "#166534" : getBookStatus(book) === "Currently Reading" ? "#B8860B" : "#4A6FA5",
+                          }}>
+                            {getBookStatus(book) === "Finished" ? "✓ " : ""}{getBookStatus(book)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Tabs */}
+          <div style={S.tabs}>
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)} style={{...S.tab, ...(tab === t.id ? S.tabActive : {})}}>
+                <span style={S.tabIcon}>{t.icon}</span>
+                <span>{t.label}</span>
+                <span style={{...S.tabCount, ...(tab === t.id ? S.tabCountActive : {})}}>{books[t.id].length}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Sort & Group */}
+          <div style={S.controls}>
+            <div style={S.controlGroup}>
+              <span style={S.controlLabel}>Sort</span>
+              <select style={S.controlSelect} value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                <option value="date-desc">Date (newest)</option>
+                <option value="date-asc">Date (oldest)</option>
+                <option value="title-asc">Title (A→Z)</option>
+                <option value="title-desc">Title (Z→A)</option>
+                <option value="author-asc">Author (A→Z)</option>
+                <option value="author-desc">Author (Z→A)</option>
+              </select>
+            </div>
+            <div style={S.controlGroup}>
+              <span style={S.controlLabel}>Group</span>
+              <select style={S.controlSelect} value={groupBy} onChange={e => setGroupBy(e.target.value)}>
+                <option value="none">None</option>
+                <option value="author">Author</option>
+                <option value="format">Format</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Book list */}
+          <div style={S.bookList}>
+            {sortedBooks.length === 0 && !search.trim() ? (
+              <div style={S.empty}>
+                <div style={S.emptyIcon}>{tab === "reading" ? "📖" : tab === "want" ? "🔖" : "🏆"}</div>
+                <div style={S.emptyTitle}>{tab === "reading" ? "Nothing on your plate" : tab === "want" ? "Your wish list is empty" : "No books finished yet"}</div>
+                <div style={S.emptyHint}>Tap the + button to add your first book</div>
+              </div>
+            ) : groupedBooks ? (
+              groupedBooks.map(([groupName, groupItems]) => (
+                <div key={groupName}>
+                  <div style={S.groupHeader}>
+                    {groupBy === "format" && FORMAT_ICONS[groupName] ? FORMAT_ICONS[groupName] + " " : ""}{groupName}
+                    <span style={S.groupCount}>{groupItems.length}</span>
+                  </div>
+                  {groupItems.map((book, i) => (
+                    <div key={book.id} style={{...S.bookCard, animationDelay: `${i * 0.05}s`}}>{renderBookCard(book)}</div>
+                  ))}
+                </div>
+              ))
+            ) : (
+              sortedBooks.map((book, i) => (
+                <div key={book.id} style={{...S.bookCard, animationDelay: `${i * 0.05}s`}}>{renderBookCard(book)}</div>
+              ))
+            )}
+          </div>
+
+          {/* FAB */}
+          {!showAdd && <button style={S.fab} onClick={() => setShowAdd(true)}>+</button>}
+
+          {/* Add/Edit Modal */}
+          {showAdd && (
+            <div style={S.overlay} onClick={resetForm}>
+              <div style={S.modal} onClick={e => e.stopPropagation()}>
+                <div style={S.modalHeader}>
+                  <h2 style={S.modalTitle}>{editingId ? "Edit Book" : "Add a Book"}</h2>
+                  <button style={S.modalClose} onClick={resetForm}>×</button>
+                </div>
+                <div style={S.formGroup}>
+                  <label style={S.label}>Title</label>
+                  <input ref={inputRef} style={S.input} placeholder="e.g. Project Hail Mary" value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => e.key === "Enter" && addBook()} />
+                </div>
+                <div style={S.formGroup}>
+                  <label style={S.label}>Author</label>
+                  <input style={S.input} placeholder="e.g. Andy Weir" value={author} onChange={e => setAuthor(e.target.value)} onKeyDown={e => e.key === "Enter" && addBook()} />
+                </div>
+                <div style={S.formGroup}>
+                  <label style={S.label}>{tab === "want" ? "Date Saved" : "Date Started"}</label>
+                  <input type="date" style={S.dateInput} value={dateStarted} onChange={e => setDateStarted(e.target.value)} />
+                </div>
+                <div style={S.formRow}>
+                  <div style={{ flex: 1 }}>
+                    <label style={S.label}>Format</label>
+                    <div style={S.segmented}>
+                      {FORMATS.map(f => <button key={f} style={{...S.segBtn, ...(format === f ? S.segBtnActive : {})}} onClick={() => setFormat(f)}>{FORMAT_ICONS[f]} {f}</button>)}
+                    </div>
+                  </div>
+                </div>
+                <div style={S.formRow}>
+                  <div style={{ flex: 1 }}>
+                    <label style={S.label}>Platform</label>
+                    <div style={S.segmented}>
+                      {PLATFORMS[format].map(p => (
+                        <button key={p} style={{...S.segBtn, ...(platform === p ? {...S.segBtnActive, background: PLATFORM_COLORS[p] + "20", color: PLATFORM_COLORS[p], borderColor: PLATFORM_COLORS[p] + "50"} : {})}} onClick={() => setPlatform(p)}>{p}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                {(tab === "reading" || editingId) && (
+                  <div style={S.formGroup}>
+                    <label style={S.label}>Progress (optional)</label>
+                    <input style={S.input} placeholder="e.g. Chapter 12, 45%, 3h 20m in" value={progress} onChange={e => setProgress(e.target.value)} onKeyDown={e => e.key === "Enter" && addBook()} />
+                  </div>
+                )}
+                <div style={S.formGroup}>
+                  <label style={S.label}>Add to</label>
+                  <div style={S.segmented}>
+                    {TABS.map(t => <button key={t.id} style={{...S.segBtn, ...(tab === t.id ? S.segBtnActive : {})}} onClick={() => !editingId && setTab(t.id)}>{t.icon} {t.label}</button>)}
+                  </div>
+                </div>
+                <button style={{...S.submitBtn, opacity: title.trim() ? 1 : 0.4, cursor: title.trim() ? "pointer" : "not-allowed"}} onClick={addBook} disabled={!title.trim()}>
+                  {editingId ? "Save Changes" : `Add to ${TABS.find(t => t.id === tab)?.label}`}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Toast */}
+          {toast && (
+            <div style={{...S.toast, background: toast.type === "success" ? "#ECFDF5" : "#FFF8ED", borderColor: toast.type === "success" ? "#BBF7D0" : "#F0DFB8", color: toast.type === "success" ? "#166534" : "#B8860B"}}>
+              {toast.type === "success" ? "🔖 " : "ℹ️ "}{toast.text}
+            </div>
+          )}
+
+          {/* Bulk Import Modal */}
+          {showBulk && (
+            <div style={S.overlay} onClick={() => { setShowBulk(false); setBulkText(""); setBulkPreview([]); }}>
+              <div style={S.modal} onClick={e => e.stopPropagation()}>
+                <div style={S.modalHeader}>
+                  <h2 style={S.modalTitle}>Bulk Import</h2>
+                  <button style={S.modalClose} onClick={() => { setShowBulk(false); setBulkText(""); setBulkPreview([]); }}>×</button>
+                </div>
+                <div style={S.bulkHint}>Paste your book list below. Supports Kindle's "Manage Content" format and simple lists:</div>
+                <div style={S.bulkExamples}>
+                  <div style={S.bulkExampleLabel}>Kindle paste:</div>
+                  <div style={S.bulkExampleLine}>Then She Was Gone: A Novel</div>
+                  <div style={S.bulkExampleLine}>Lisa Jewell</div>
+                  <div style={S.bulkExampleLine}>Acquired on January 18, 2026</div>
+                  <div style={{ height: 8 }} />
+                  <div style={S.bulkExampleLabel}>Simple list:</div>
+                  <div style={S.bulkExampleLine}>Project Hail Mary by Andy Weir</div>
+                  <div style={S.bulkExampleLine}>Dune - Frank Herbert</div>
+                </div>
+                <div style={S.formGroup}>
+                  <label style={S.label}>Book List</label>
+                  <textarea ref={bulkRef} style={S.bulkTextarea} placeholder={"Paste your books here, one per line...\ne.g. Title by Author"} value={bulkText} onChange={e => setBulkText(e.target.value)} rows={8} />
+                </div>
+                {bulkPreview.length > 0 && (
+                  <div style={S.formGroup}>
+                    <label style={S.label}>Preview ({bulkPreview.length} book{bulkPreview.length !== 1 ? "s" : ""} detected)</label>
+                    <div style={S.bulkPreviewList}>
+                      {bulkPreview.map((b, i) => (
+                        <div key={i} style={S.bulkPreviewItem}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <span style={S.bulkPreviewTitle}>{b.title}</span>
+                            {b.author && <span style={S.bulkPreviewAuthor}> — {b.author}</span>}
+                          </div>
+                          {b.dateStarted && <span style={S.bulkPreviewDate}>{new Date(b.dateStarted + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div style={S.formRow}>
+                  <div style={{ flex: 1 }}>
+                    <label style={S.label}>Format</label>
+                    <div style={S.segmented}>
+                      {FORMATS.map(f => <button key={f} style={{...S.segBtn, ...(bulkFormat === f ? S.segBtnActive : {})}} onClick={() => setBulkFormat(f)}>{FORMAT_ICONS[f]} {f}</button>)}
+                    </div>
+                  </div>
+                </div>
+                <div style={S.formRow}>
+                  <div style={{ flex: 1 }}>
+                    <label style={S.label}>Platform</label>
+                    <div style={S.segmented}>
+                      {PLATFORMS[bulkFormat].map(p => (
+                        <button key={p} style={{...S.segBtn, ...(bulkPlatform === p ? {...S.segBtnActive, background: PLATFORM_COLORS[p] + "20", color: PLATFORM_COLORS[p], borderColor: PLATFORM_COLORS[p] + "50"} : {})}} onClick={() => setBulkPlatform(p)}>{p}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div style={S.formGroup}>
+                  <label style={S.label}>Add to</label>
+                  <div style={S.segmented}>
+                    {TABS.map(t => <button key={t.id} style={{...S.segBtn, ...(bulkTab === t.id ? S.segBtnActive : {})}} onClick={() => setBulkTab(t.id)}>{t.icon} {t.label}</button>)}
+                  </div>
+                </div>
+                <button style={{...S.submitBtn, opacity: bulkPreview.length > 0 ? 1 : 0.4, cursor: bulkPreview.length > 0 ? "pointer" : "not-allowed"}} onClick={submitBulk} disabled={bulkPreview.length === 0}>
+                  Import {bulkPreview.length} Book{bulkPreview.length !== 1 ? "s" : ""}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ── Styles ──
+    const S = {
+      container: { fontFamily: "'Outfit', sans-serif", background: "#F7F5F2", minHeight: "100vh", color: "#44403C", padding: "28px 24px 100px", maxWidth: 560, margin: "0 auto" },
+      header: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 24, paddingBottom: 16, borderBottom: "1px solid #E7E2DC" },
+      headerLeft: { display: "flex", flexDirection: "column", gap: 2 },
+      logo: { fontFamily: "'Libre Baskerville', serif", fontSize: 30, fontWeight: 400, color: "#1C1917", letterSpacing: "-0.01em", lineHeight: 1 },
+      stats: { display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "#A8A29E" },
+      statItem: { display: "flex", gap: 4, alignItems: "center" },
+      statNum: { color: "#57534E", fontWeight: 600 },
+      statDivider: { color: "#D6D3D1" },
+      searchWrap: { position: "relative", marginBottom: 16, display: "flex", gap: 8, alignItems: "center" },
+      searchIcon: { position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", fontSize: 16, color: "#A8A29E", pointerEvents: "none" },
+      searchInput: { flex: 1, padding: "11px 40px 11px 40px", background: "#FFFFFF", border: "1px solid #E7E2DC", borderRadius: 10, color: "#1C1917", fontSize: 14, fontFamily: "'Outfit', sans-serif", transition: "border-color 0.2s" },
+      bulkBtn: { padding: "11px 14px", background: "#FFFFFF", border: "1px solid #E7E2DC", borderRadius: 10, color: "#78716C", fontSize: 12, fontFamily: "'Outfit', sans-serif", fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.15s", letterSpacing: "0.02em" },
+      clearBtn: { position: "absolute", right: 96, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#A8A29E", fontSize: 18, cursor: "pointer", padding: "4px 8px" },
+      searchResults: { background: "#FFFFFF", border: "1px solid #E7E2DC", borderRadius: 12, padding: 6, marginBottom: 16, animation: "fadeIn 0.2s ease", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" },
+      searchResultItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderRadius: 8, transition: "background 0.15s", cursor: "default", background: "#FFFFFF", position: "relative", zIndex: 1, userSelect: "none" },
+      searchResultLeft: { display: "flex", gap: 10, alignItems: "center" },
+      searchResultTitle: { fontSize: 14, fontWeight: 500, color: "#1C1917" },
+      searchResultAuthor: { fontSize: 12, color: "#A8A29E", marginTop: 1 },
+      formatBadge: { fontSize: 16, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "#F5F3F0", borderRadius: 8 },
+      statusBadge: { fontSize: 10, fontWeight: 600, padding: "4px 9px", borderRadius: 20, letterSpacing: "0.04em", textTransform: "uppercase", whiteSpace: "nowrap" },
+      noResults: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "20px 16px", color: "#78716C", fontSize: 14 },
+      tabs: { display: "flex", gap: 4, marginBottom: 16 },
+      tab: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "9px 6px", background: "transparent", border: "1px solid #E7E2DC", borderRadius: 9, color: "#A8A29E", fontSize: 12, fontFamily: "'Outfit', sans-serif", fontWeight: 500, cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap" },
+      tabActive: { background: "#FFFFFF", color: "#1C1917", borderColor: "#D4CFC8", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" },
+      tabIcon: { fontSize: 13 },
+      tabCount: { fontSize: 10, fontWeight: 600, background: "#F0EDE8", color: "#A8A29E", padding: "2px 6px", borderRadius: 8 },
+      tabCountActive: { background: "#E7E2DC", color: "#57534E" },
+      controls: { display: "flex", gap: 10, marginBottom: 14, alignItems: "center" },
+      controlGroup: { display: "flex", alignItems: "center", gap: 6 },
+      controlLabel: { fontSize: 11, color: "#A8A29E", fontWeight: 500, letterSpacing: "0.03em" },
+      controlSelect: { padding: "5px 8px", background: "#FFFFFF", border: "1px solid #E7E2DC", borderRadius: 7, color: "#57534E", fontSize: 12, fontFamily: "'Outfit', sans-serif", fontWeight: 500, cursor: "pointer", outline: "none" },
+      groupHeader: { fontSize: 12, fontWeight: 600, color: "#78716C", textTransform: "uppercase", letterSpacing: "0.06em", padding: "16px 0 6px", display: "flex", alignItems: "center", gap: 8 },
+      groupCount: { fontSize: 10, fontWeight: 600, background: "#F0EDE8", color: "#A8A29E", padding: "2px 6px", borderRadius: 8 },
+      bookList: { display: "flex", flexDirection: "column", gap: 8 },
+      bookCard: { background: "#FFFFFF", border: "1px solid #E7E2DC", borderRadius: 12, padding: "14px 16px", animation: "slideUp 0.3s ease both", transition: "border-color 0.2s" },
+      bookTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 },
+      bookInfo: { flex: 1, paddingRight: 12 },
+      bookTitle: { fontFamily: "'Libre Baskerville', serif", fontSize: 16, fontWeight: 400, color: "#1C1917", lineHeight: 1.35 },
+      bookAuthor: { fontSize: 13, color: "#A8A29E", marginTop: 2, fontStyle: "italic" },
+      bookActions: { display: "flex", gap: 2, alignItems: "center" },
+      iconBtn: { background: "none", border: "none", color: "#A8A29E", fontSize: 15, cursor: "pointer", padding: "4px 6px", borderRadius: 6, transition: "color 0.15s" },
+      confirmRow: { display: "flex", gap: 2, fontSize: 12 },
+      bookMeta: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 10 },
+      platformTag: { fontSize: 11, fontWeight: 500, padding: "3px 9px", borderRadius: 16, border: "1px solid", letterSpacing: "0.02em" },
+      progressTag: { fontSize: 11, color: "#78716C", background: "#F5F3F0", padding: "3px 9px", borderRadius: 16, fontWeight: 500 },
+      dateTag: { fontSize: 11, color: "#A8A29E", marginLeft: "auto" },
+      moveRow: { display: "flex", gap: 4, paddingTop: 10, borderTop: "1px solid #F0EDE8" },
+      moveBtn: { flex: 1, padding: "6px 0", background: "transparent", border: "1px solid #E7E2DC", borderRadius: 7, color: "#78716C", fontSize: 11, fontFamily: "'Outfit', sans-serif", fontWeight: 500, cursor: "pointer", transition: "all 0.15s" },
+      moveBtnFinish: { borderColor: "#BBF7D0", color: "#166534", background: "#F0FDF4" },
+      empty: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "56px 20px", color: "#A8A29E" },
+      emptyIcon: { fontSize: 36, marginBottom: 6 },
+      emptyTitle: { fontFamily: "'Libre Baskerville', serif", fontSize: 17, color: "#78716C" },
+      emptyHint: { fontSize: 13, color: "#A8A29E" },
+      fab: { position: "fixed", bottom: 28, right: 24, width: 52, height: 52, borderRadius: "50%", background: "#C2785C", border: "none", color: "#FFFFFF", fontSize: 26, fontWeight: 300, cursor: "pointer", boxShadow: "0 2px 12px rgba(194, 120, 92, 0.3)", display: "flex", alignItems: "center", justifyContent: "center", transition: "transform 0.2s, box-shadow 0.2s", zIndex: 100 },
+      overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.2)", backdropFilter: "blur(6px)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200, animation: "fadeIn 0.2s ease" },
+      modal: { background: "#FFFFFF", border: "1px solid #E7E2DC", borderRadius: "18px 18px 0 0", padding: "22px 22px 30px", width: "100%", maxWidth: 560, maxHeight: "85vh", overflow: "auto", animation: "slideUp 0.3s ease", boxShadow: "0 -4px 24px rgba(0,0,0,0.08)" },
+      modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 },
+      modalTitle: { fontFamily: "'Libre Baskerville', serif", fontSize: 20, fontWeight: 400, color: "#1C1917" },
+      modalClose: { background: "none", border: "none", color: "#A8A29E", fontSize: 22, cursor: "pointer", padding: "4px 8px" },
+      formGroup: { marginBottom: 16 },
+      formRow: { display: "flex", gap: 10, marginBottom: 16 },
+      label: { display: "block", fontSize: 11, fontWeight: 600, color: "#78716C", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 },
+      input: { width: "100%", padding: "10px 12px", background: "#F7F5F2", border: "1px solid #E7E2DC", borderRadius: 8, color: "#1C1917", fontSize: 14, fontFamily: "'Outfit', sans-serif" },
+      dateInput: { width: "100%", padding: "10px 12px", background: "#F7F5F2", border: "1px solid #E7E2DC", borderRadius: 8, color: "#1C1917", fontSize: 14, fontFamily: "'Outfit', sans-serif", colorScheme: "light" },
+      segmented: { display: "flex", gap: 4, flexWrap: "wrap" },
+      segBtn: { flex: 1, padding: "8px 10px", background: "#F7F5F2", border: "1px solid #E7E2DC", borderRadius: 7, color: "#A8A29E", fontSize: 12, fontFamily: "'Outfit', sans-serif", fontWeight: 500, cursor: "pointer", transition: "all 0.15s", whiteSpace: "nowrap", minWidth: "fit-content" },
+      segBtnActive: { background: "#FFFFFF", color: "#1C1917", borderColor: "#D4CFC8", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" },
+      submitBtn: { width: "100%", padding: "12px", background: "#C2785C", border: "none", borderRadius: 10, color: "#FFFFFF", fontSize: 14, fontFamily: "'Outfit', sans-serif", fontWeight: 600, cursor: "pointer", marginTop: 6, letterSpacing: "0.02em", transition: "opacity 0.2s" },
+      bulkHint: { fontSize: 13, color: "#78716C", lineHeight: 1.5, marginBottom: 10 },
+      bulkExamples: { background: "#F7F5F2", border: "1px solid #E7E2DC", borderRadius: 8, padding: "10px 14px", marginBottom: 18, display: "flex", flexDirection: "column", gap: 3 },
+      bulkExampleLine: { fontSize: 12, color: "#A8A29E", fontFamily: "monospace", lineHeight: 1.5 },
+      bulkExampleLabel: { fontSize: 10, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, fontFamily: "'Outfit', sans-serif", marginBottom: 2 },
+      bulkTextarea: { width: "100%", padding: "10px 12px", background: "#F7F5F2", border: "1px solid #E7E2DC", borderRadius: 8, color: "#1C1917", fontSize: 14, fontFamily: "'Outfit', sans-serif", resize: "vertical", minHeight: 130, lineHeight: 1.5 },
+      bulkPreviewList: { background: "#F7F5F2", border: "1px solid #E7E2DC", borderRadius: 8, padding: 6, maxHeight: 160, overflow: "auto" },
+      bulkPreviewItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 10px", borderRadius: 6, gap: 8 },
+      bulkPreviewTitle: { fontSize: 13, color: "#1C1917", fontWeight: 500 },
+      bulkPreviewAuthor: { fontSize: 12, color: "#A8A29E", fontStyle: "italic", textAlign: "right", flexShrink: 0 },
+      bulkPreviewDate: { fontSize: 11, color: "#A8A29E", whiteSpace: "nowrap", flexShrink: 0, marginLeft: 8 },
+      swipeContainer: { position: "relative", overflow: "hidden", borderRadius: 8 },
+      swipeAction: { position: "absolute", right: 0, top: 0, bottom: 0, width: 120, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, color: "#166534", fontWeight: 500, fontSize: 12, transition: "background 0.15s" },
+      swipeHint: { fontSize: 11, color: "#A8A29E", textAlign: "center", padding: "5px 0 3px", letterSpacing: "0.03em" },
+      urlCard: { display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: "#F7F5F2", borderRadius: 10, border: "1px solid #E7E2DC", margin: 6 },
+      urlCardIcon: { fontSize: 20, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", background: "#FFFFFF", borderRadius: 8, flexShrink: 0 },
+      urlCardContent: { flex: 1, minWidth: 0 },
+      urlCardLabel: { fontSize: 10, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 2 },
+      urlCardTitle: { fontSize: 14, color: "#1C1917", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+      urlSaveBtn: { padding: "7px 14px", background: "#C2785C", border: "none", borderRadius: 8, color: "#FFFFFF", fontSize: 13, fontFamily: "'Outfit', sans-serif", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 },
+      quickAddBtn: { marginTop: 10, padding: "9px 16px", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, color: "#166534", fontSize: 13, fontFamily: "'Outfit', sans-serif", fontWeight: 500, cursor: "pointer", transition: "all 0.15s", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+      toast: { position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)", padding: "10px 18px", borderRadius: 10, border: "1px solid", fontSize: 13, fontWeight: 500, fontFamily: "'Outfit', sans-serif", zIndex: 300, animation: "slideUp 0.3s ease", boxShadow: "0 4px 16px rgba(0,0,0,0.08)", whiteSpace: "nowrap", maxWidth: "90vw", overflow: "hidden", textOverflow: "ellipsis" },
+      readCheckBanner: { display: "flex", alignItems: "flex-start", gap: 12, padding: "14px 16px", margin: "6px 6px 4px", background: "#ECFDF5", border: "1px solid #BBF7D0", borderRadius: 10, animation: "slideUp 0.25s ease" },
+      readCheckIcon: { width: 36, height: 36, borderRadius: 18, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, background: "#D1FAE5", color: "#166534", flexShrink: 0 },
+      readCheckContent: { flex: 1, minWidth: 0 },
+      readCheckTitle: { fontSize: 14, fontWeight: 600, color: "#166534", fontFamily: "'Outfit', sans-serif", marginBottom: 3 },
+      readCheckBooks: { fontSize: 13, color: "#78716C", lineHeight: 1.5, display: "flex", flexDirection: "column", gap: 2 },
+      readCheckBookName: { fontFamily: "'Libre Baskerville', serif", fontStyle: "italic", fontSize: 13, color: "#57534E" },
+    };
+
+    ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(BookTracker));
+  </script>
+</body>
+</html>
