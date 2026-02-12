@@ -444,7 +444,6 @@
             React.createElement("span", { style: { ...S.platformTag, background: PLATFORM_COLORS[book.platform] + "15", color: PLATFORM_COLORS[book.platform], borderColor: PLATFORM_COLORS[book.platform] + "30" } },
               FORMAT_ICONS[book.format] + " " + book.platform
             ),
-            book.progress && React.createElement("span", { style: S.progressTag }, "↗ " + book.progress),
             book.tags && book.tags.length > 0 && book.tags.map(t => React.createElement("span", { key: t, style: S.genreTag }, t)),
             book.dateStarted && React.createElement("span", { style: S.dateTag },
               (tab === "want" ? "Saved " : "Started ") + new Date(book.dateStarted + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -795,6 +794,7 @@
                     </div>
                   </div>
                 )}
+                {bulkTab !== "want" && (<>
                 <div style={S.formRow}>
                   <div style={{ flex: 1 }}>
                     <label style={S.label}>Format</label>
@@ -813,6 +813,7 @@
                     </div>
                   </div>
                 </div>
+                </>)}
                 <div style={S.formGroup}>
                   <label style={S.label}>Add to</label>
                   <div style={S.segmented}>
