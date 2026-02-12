@@ -78,6 +78,7 @@
     ];
     const FORMAT_ICONS = { Kindle: "⚡", Hardcopy: "📕", Audiobook: "🎧" };
     const PLATFORM_COLORS = { Kindle: "#D97706", IRL: "#8B7355", Libby: "#DC2626", Spotify: "#16A34A" };
+    const GENRES = ["Thriller", "Romance", "Sci-Fi", "Fantasy", "Mystery", "Horror", "Literary Fiction", "Historical Fiction", "Non-Fiction", "Self-Help", "Memoir", "Biography", "True Crime"];
     const initialBooks = { reading: [], want: [], finished: [] };
 
     function BookTracker() {
@@ -105,6 +106,9 @@
       const [swipeStates, setSwipeStates] = useState({});
       const [toast, setToast] = useState(null);
       const [urlParsed, setUrlParsed] = useState(null);
+      const [tags, setTags] = useState([]);
+      const [customTagInput, setCustomTagInput] = useState("");
+      const [customTags, setCustomTags] = useState([]);
       const touchRef = useRef({});
       const inputRef = useRef(null);
       const bulkRef = useRef(null);
@@ -116,6 +120,10 @@
             const data = await dbGet("shelf-books");
             if (data && data.reading && data.want && data.finished) setBooks(data);
           } catch (e) {}
+          try {
+            const ct = await dbGet("shelf-custom-tags");
+            if (ct && Array.isArray(ct)) setCustomTags(ct);
+          } catch (e) {}
           setBooksLoaded(true);
         })();
       }, []);
@@ -125,6 +133,11 @@
         if (!booksLoaded) return;
         dbSet("shelf-books", books).catch(e => console.error("Save failed:", e));
       }, [books, booksLoaded]);
+
+      useEffect(() => {
+        if (!booksLoaded) return;
+        dbSet("shelf-custom-tags", customTags).catch(e => console.error("Save tags failed:", e));
+      }, [customTags, booksLoaded]);
 
       useEffect(() => { if (showAdd && inputRef.current) inputRef.current.focus(); }, [showAdd]);
       useEffect(() => { if (showBulk && bulkRef.current) bulkRef.current.focus(); }, [showBulk]);
@@ -197,7 +210,7 @@
         if (!title.trim()) return;
         const newBook = {
           id: Date.now(), title: title.trim(), author: author.trim(),
-          format, platform, progress: progress.trim(), dateStarted,
+          format, platform, progress: progress.trim(), dateStarted, tags: [...tags],
           addedAt: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
         };
         if (editingId) {
@@ -216,6 +229,7 @@
       const resetForm = () => {
         setTitle(""); setAuthor(""); setFormat("Kindle"); setPlatform("Kindle");
         setProgress(""); setDateStarted(new Date().toISOString().slice(0, 10));
+        setTags([]); setCustomTagInput("");
         setShowAdd(false); setEditingId(null);
       };
 
@@ -355,6 +369,7 @@
         setTitle(book.title); setAuthor(book.author); setFormat(book.format);
         setPlatform(book.platform); setProgress(book.progress || "");
         setDateStarted(book.dateStarted || new Date().toISOString().slice(0, 10));
+        setTags(book.tags || []);
         setEditingId(book.id); setShowAdd(true);
       };
 
@@ -390,9 +405,17 @@
         if (groupBy === "none") return null;
         const groups = {};
         sortedBooks.forEach(book => {
-          const key = groupBy === "author" ? (book.author || "Unknown Author") : (book.format || "Unknown");
-          if (!groups[key]) groups[key] = [];
-          groups[key].push(book);
+          if (groupBy === "tag") {
+            const bookTags = book.tags && book.tags.length > 0 ? book.tags : ["Untagged"];
+            bookTags.forEach(t => {
+              if (!groups[t]) groups[t] = [];
+              groups[t].push(book);
+            });
+          } else {
+            const key = groupBy === "author" ? (book.author || "Unknown Author") : (book.format || "Unknown");
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(book);
+          }
         });
         return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
       })();
@@ -419,6 +442,7 @@
               FORMAT_ICONS[book.format] + " " + book.platform
             ),
             book.progress && React.createElement("span", { style: S.progressTag }, "↗ " + book.progress),
+            book.tags && book.tags.length > 0 && book.tags.map(t => React.createElement("span", { key: t, style: S.genreTag }, t)),
             book.dateStarted && React.createElement("span", { style: S.dateTag },
               (tab === "want" ? "Saved " : "Started ") + new Date(book.dateStarted + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
             )
@@ -597,6 +621,7 @@
                 <option value="none">None</option>
                 <option value="author">Author</option>
                 <option value="format">Format</option>
+                <option value="tag">Tag</option>
               </select>
             </div>
           </div>
@@ -675,6 +700,38 @@
                     <input style={S.input} placeholder="e.g. Chapter 12, 45%, 3h 20m in" value={progress} onChange={e => setProgress(e.target.value)} onKeyDown={e => e.key === "Enter" && addBook()} />
                   </div>
                 )}
+                <div style={S.formGroup}>
+                  <label style={S.label}>Tags</label>
+                  <div style={S.tagSelector}>
+                    {GENRES.map(g => (
+                      <button key={g} style={{...S.tagChip, ...(tags.includes(g) ? S.tagChipActive : {})}}
+                        onClick={() => setTags(prev => prev.includes(g) ? prev.filter(t => t !== g) : [...prev, g])}>{g}</button>
+                    ))}
+                    {customTags.map(g => (
+                      <button key={g} style={{...S.tagChip, ...(tags.includes(g) ? S.tagChipCustomActive : S.tagChipCustom)}}
+                        onClick={() => setTags(prev => prev.includes(g) ? prev.filter(t => t !== g) : [...prev, g])}>{g}</button>
+                    ))}
+                  </div>
+                  <div style={S.customTagRow}>
+                    <input style={{...S.input, flex: 1, marginBottom: 0}} placeholder="Add custom tag…" value={customTagInput}
+                      onChange={e => setCustomTagInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter" && customTagInput.trim()) {
+                          const t = customTagInput.trim();
+                          if (!GENRES.includes(t) && !customTags.includes(t)) setCustomTags(prev => [...prev, t]);
+                          if (!tags.includes(t)) setTags(prev => [...prev, t]);
+                          setCustomTagInput("");
+                        }
+                      }} />
+                    <button style={S.customTagAddBtn} onClick={() => {
+                      const t = customTagInput.trim();
+                      if (!t) return;
+                      if (!GENRES.includes(t) && !customTags.includes(t)) setCustomTags(prev => [...prev, t]);
+                      if (!tags.includes(t)) setTags(prev => [...prev, t]);
+                      setCustomTagInput("");
+                    }}>+</button>
+                  </div>
+                </div>
                 <div style={S.formGroup}>
                   <label style={S.label}>Add to</label>
                   <div style={S.segmented}>
@@ -866,6 +923,14 @@
       readCheckTitle: { fontSize: 14, fontWeight: 600, color: "#166534", fontFamily: "'Outfit', sans-serif", marginBottom: 3 },
       readCheckBooks: { fontSize: 13, color: "#78716C", lineHeight: 1.5, display: "flex", flexDirection: "column", gap: 2 },
       readCheckBookName: { fontFamily: "'Libre Baskerville', serif", fontStyle: "italic", fontSize: 13, color: "#57534E" },
+      tagSelector: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 },
+      tagChip: { padding: "5px 10px", background: "#F7F5F2", border: "1px solid #E7E2DC", borderRadius: 14, color: "#78716C", fontSize: 11, fontFamily: "'Outfit', sans-serif", fontWeight: 500, cursor: "pointer", transition: "all 0.15s", whiteSpace: "nowrap" },
+      tagChipActive: { background: "#C2785C18", color: "#C2785C", borderColor: "#C2785C40" },
+      tagChipCustom: { background: "#F0F4FF", borderColor: "#D0DBFF", color: "#4A6FA5" },
+      tagChipCustomActive: { background: "#4A6FA520", color: "#4A6FA5", borderColor: "#4A6FA560" },
+      customTagRow: { display: "flex", gap: 6, alignItems: "center", marginTop: 6 },
+      customTagAddBtn: { width: 34, height: 34, borderRadius: 8, background: "#C2785C", border: "none", color: "#FFFFFF", fontSize: 18, fontWeight: 300, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+      genreTag: { fontSize: 10, fontWeight: 500, padding: "2px 8px", borderRadius: 12, background: "#C2785C12", color: "#C2785C", border: "1px solid #C2785C25" },
     };
 
     ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(BookTracker));
