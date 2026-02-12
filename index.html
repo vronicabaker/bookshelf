@@ -198,7 +198,7 @@
         }
         const newBook = {
           id: Date.now(), title: bookTitle.trim(), author: bookAuthor.trim(),
-          format: "Kindle", platform: "Kindle", progress: "",
+          format: "", platform: "", progress: "", tags: [],
           dateStarted: new Date().toISOString().slice(0, 10),
           addedAt: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
         };
@@ -211,7 +211,7 @@
         if (!title.trim()) return;
         const newBook = {
           id: Date.now(), title: title.trim(), author: author.trim(),
-          format, platform, progress: progress.trim(), dateStarted, tags: [...tags],
+          format: tab === "want" ? "" : format, platform: tab === "want" ? "" : platform, progress: progress.trim(), dateStarted, tags: [...tags],
           coverUrl: coverUrl.trim(),
           addedAt: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
         };
@@ -303,7 +303,8 @@
         const now = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
         const newBooks = bulkPreview.map((b, i) => ({
           id: Date.now() + i, title: b.title, author: b.author,
-          format: bulkFormat, platform: bulkPlatform, progress: "",
+          format: bulkTab === "want" ? "" : bulkFormat, platform: bulkTab === "want" ? "" : bulkPlatform, progress: "",
+          tags: [],
           dateStarted: b.dateStarted || new Date().toISOString().slice(0, 10), addedAt: now,
         }));
         setBooks(prev => ({ ...prev, [bulkTab]: [...prev[bulkTab], ...newBooks] }));
@@ -441,7 +442,7 @@
             )
           ),
           React.createElement("div", { style: S.bookMeta },
-            React.createElement("span", { style: { ...S.platformTag, background: PLATFORM_COLORS[book.platform] + "15", color: PLATFORM_COLORS[book.platform], borderColor: PLATFORM_COLORS[book.platform] + "30" } },
+            book.platform && React.createElement("span", { style: { ...S.platformTag, background: PLATFORM_COLORS[book.platform] + "15", color: PLATFORM_COLORS[book.platform], borderColor: PLATFORM_COLORS[book.platform] + "30" } },
               FORMAT_ICONS[book.format] + " " + book.platform
             ),
             book.tags && book.tags.length > 0 && book.tags.map(t => React.createElement("span", { key: t, style: S.genreTag }, t)),
