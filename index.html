@@ -69,14 +69,14 @@
     };
 
     // ── Constants ──
-    const FORMATS = ["Kindle", "Hardcopy", "Audiobook"];
-    const PLATFORMS = { Kindle: ["Kindle"], Hardcopy: ["IRL"], Audiobook: ["Libby", "Spotify"] };
+    const FORMATS = ["Kindle", "Physical", "Audiobook"];
+    const PLATFORMS = { Kindle: ["Kindle"], Physical: ["IRL"], Audiobook: ["Libby", "Spotify"] };
     const TABS = [
-      { id: "reading", label: "Currently Reading", icon: "📖" },
-      { id: "want", label: "Want to Read", icon: "🔖" },
-      { id: "finished", label: "Finished", icon: "✓" },
+      { id: "reading", label: "Currently Reading", icon: "" },
+      { id: "want", label: "Want to Read", icon: "" },
+      { id: "finished", label: "Finished", icon: "" },
     ];
-    const FORMAT_ICONS = { Kindle: "⚡", Hardcopy: "📕", Audiobook: "🎧" };
+    const FORMAT_ICONS = { Kindle: "", Physical: "", Audiobook: "" };
     const PLATFORM_COLORS = { Kindle: "#D97706", IRL: "#8B7355", Libby: "#DC2626", Spotify: "#16A34A" };
     const GENRES = ["Thriller", "Romance", "Sci-Fi", "Fantasy", "Mystery", "Horror", "Literary Fiction", "Historical Fiction", "Non-Fiction", "Self-Help", "Memoir", "Biography", "True Crime"];
     const initialBooks = { reading: [], want: [], finished: [] };
@@ -443,7 +443,7 @@
           ),
           React.createElement("div", { style: S.bookMeta },
             book.platform && React.createElement("span", { style: { ...S.platformTag, background: PLATFORM_COLORS[book.platform] + "15", color: PLATFORM_COLORS[book.platform], borderColor: PLATFORM_COLORS[book.platform] + "30" } },
-              FORMAT_ICONS[book.format] + " " + book.platform
+              (FORMAT_ICONS[book.format] ? FORMAT_ICONS[book.format] + " " : "") + book.platform
             ),
             book.tags && book.tags.length > 0 && book.tags.map(t => React.createElement("span", { key: t, style: S.genreTag }, t)),
             book.dateStarted && React.createElement("span", { style: S.dateTag },
@@ -453,7 +453,7 @@
           React.createElement("div", { style: S.moveRow },
             tab !== "reading" && React.createElement("button", { style: S.moveBtn, onClick: () => moveBook(book.id, tab, "reading") }, "Move to Reading"),
             tab !== "want" && React.createElement("button", { style: S.moveBtn, onClick: () => moveBook(book.id, tab, "want") }, "Move to Want"),
-            tab !== "finished" && React.createElement("button", { style: { ...S.moveBtn, ...S.moveBtnFinish }, onClick: () => moveBook(book.id, tab, "finished") }, "✓ Mark Finished")
+            tab !== "finished" && React.createElement("button", { style: { ...S.moveBtn, ...S.moveBtnFinish }, onClick: () => moveBook(book.id, tab, "finished") }, "Mark Finished")
           )
         )
       );
@@ -473,17 +473,17 @@
               <span style={S.statDivider}>·</span>
               <span style={S.statItem}><span style={S.statNum}>{books.want.length}</span> queued</span>
               <span style={S.statDivider}>·</span>
-              <button style={S.dataBtn} onClick={exportLibrary} title="Export backup">↓ Export</button>
-              <button style={S.dataBtn} onClick={importLibrary} title="Import backup">↑ Import</button>
+              <button style={S.dataBtn} onClick={exportLibrary} title="Export backup">Export</button>
+              <button style={S.dataBtn} onClick={importLibrary} title="Import backup">Import</button>
             </div>
           </div>
 
           {/* Search */}
           <div style={S.searchWrap}>
-            <span style={S.searchIcon}>⌕</span>
+            <span style={S.searchIcon}>Search</span>
             <input style={S.searchInput} placeholder="Search your library or check if you've read something…" value={search} onChange={e => setSearch(e.target.value)} />
             {search && <button style={S.clearBtn} onClick={() => setSearch("")}>×</button>}
-            <button style={S.bulkBtn} onClick={() => setShowBulk(true)} title="Bulk import">⤓ Import</button>
+            <button style={S.bulkBtn} onClick={() => setShowBulk(true)} title="Bulk import">Import</button>
           </div>
 
           {/* Search results */}
@@ -498,7 +498,7 @@
 
                 if (finishedMatch.length > 0) return (
                   <div style={S.readCheckBanner}>
-                    <div style={S.readCheckIcon}>✓</div>
+                    <div style={S.readCheckIcon}>done</div>
                     <div style={S.readCheckContent}>
                       <div style={S.readCheckTitle}>Yes, you've read {finishedMatch.length === 1 ? "this" : "these"}!</div>
                       <div style={S.readCheckBooks}>{finishedMatch.map(b => <span key={b.id} style={S.readCheckBookName}>{b.title}{b.author ? ` — ${b.author}` : ""}</span>)}</div>
@@ -507,7 +507,7 @@
                 );
                 if (readingMatch.length > 0) return (
                   <div style={{...S.readCheckBanner, background: "#FFF8ED", borderColor: "#F0DFB8"}}>
-                    <div style={{...S.readCheckIcon, background: "#FFF0D4", color: "#B8860B"}}>📖</div>
+                    <div style={{...S.readCheckIcon, background: "#FFF0D4", color: "#B8860B"}}>!</div>
                     <div style={S.readCheckContent}>
                       <div style={{...S.readCheckTitle, color: "#B8860B"}}>You're reading {readingMatch.length === 1 ? "this" : "these"} now</div>
                       <div style={S.readCheckBooks}>{readingMatch.map(b => <span key={b.id} style={S.readCheckBookName}>{b.title}{b.progress ? ` (${b.progress})` : ""}</span>)}</div>
@@ -516,7 +516,7 @@
                 );
                 if (wantMatch.length > 0) return (
                   <div style={{...S.readCheckBanner, background: "#F0F4FF", borderColor: "#D0DBFF"}}>
-                    <div style={{...S.readCheckIcon, background: "#E0E8FF", color: "#4A6FA5"}}>🔖</div>
+                    <div style={{...S.readCheckIcon, background: "#E0E8FF", color: "#4A6FA5"}}>+</div>
                     <div style={S.readCheckContent}>
                       <div style={{...S.readCheckTitle, color: "#4A6FA5"}}>On your Want to Read list</div>
                       <div style={S.readCheckBooks}>{wantMatch.map(b => <span key={b.id} style={S.readCheckBookName}>{b.title}{b.author ? ` — ${b.author}` : ""}</span>)}</div>
@@ -551,7 +551,7 @@
                   <span style={{ fontSize: 20 }}>🔍</span>
                   <span>No books found matching "{search}"</span>
                   <button style={S.quickAddBtn} onClick={() => quickSaveToWant(search, "")}>
-                    🔖 Quick save "{search.length > 30 ? search.slice(0, 30) + "…" : search}" to Want to Read
+                    Quick save "{search.length > 30 ? search.slice(0, 30) + "…" : search}" to Want to Read
                   </button>
                 </div>
               ) : !urlParsed && (
@@ -563,7 +563,7 @@
                     return (
                       <div key={book.id} style={S.swipeContainer}>
                         <div style={{...S.swipeAction, opacity: Math.min(swipeX / 70, 1), background: isRevealed ? "#D4EDDA" : "#E8F5E9"}}>
-                          <span style={{ fontSize: isRevealed ? 18 : 14, transition: "font-size 0.15s" }}>{isRevealed ? "🔖 Release to save" : "🔖"}</span>
+                          <span style={{ fontSize: isRevealed ? 18 : 14, transition: "font-size 0.15s" }}>{isRevealed ? "Release to save" : "+"}</span>
                         </div>
                         <div
                           style={{...S.searchResultItem, transform: `translateX(${-swipeX}px)`, transition: swipeX === 0 ? "transform 0.3s ease" : "none"}}
@@ -572,7 +572,7 @@
                           onMouseLeave={() => { if (touchRef.current[book.id]?.mouseDown) handleMouseUp(book.id, book); }}
                         >
                           <div style={S.searchResultLeft}>
-                            <span style={S.formatBadge}>{FORMAT_ICONS[book.format]}</span>
+                            <span style={S.formatBadge}>{(book.format || "?")[0]}</span>
                             <div>
                               <div style={S.searchResultTitle}>{book.title}</div>
                               <div style={S.searchResultAuthor}>{book.author}</div>
@@ -583,7 +583,7 @@
                             background: getBookStatus(book) === "Finished" ? "#ECFDF5" : getBookStatus(book) === "Currently Reading" ? "#FFF8ED" : "#F0F4FF",
                             color: getBookStatus(book) === "Finished" ? "#166534" : getBookStatus(book) === "Currently Reading" ? "#B8860B" : "#4A6FA5",
                           }}>
-                            {getBookStatus(book) === "Finished" ? "✓ " : ""}{getBookStatus(book)}
+                            {getBookStatus(book) === "Finished" ? "" : ""}{getBookStatus(book)}
                           </div>
                         </div>
                       </div>
@@ -598,7 +598,6 @@
           <div style={S.tabs}>
             {TABS.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)} style={{...S.tab, ...(tab === t.id ? S.tabActive : {})}}>
-                <span style={S.tabIcon}>{t.icon}</span>
                 <span>{t.label}</span>
                 <span style={{...S.tabCount, ...(tab === t.id ? S.tabCountActive : {})}}>{books[t.id].length}</span>
               </button>
@@ -633,7 +632,7 @@
           <div style={S.bookList}>
             {sortedBooks.length === 0 && !search.trim() ? (
               <div style={S.empty}>
-                <div style={S.emptyIcon}>{tab === "reading" ? "📖" : tab === "want" ? "🔖" : "🏆"}</div>
+                <div style={S.emptyIcon}>{tab === "reading" ? "" : tab === "want" ? "" : ""}</div>
                 <div style={S.emptyTitle}>{tab === "reading" ? "Nothing on your plate" : tab === "want" ? "Your wish list is empty" : "No books finished yet"}</div>
                 <div style={S.emptyHint}>Tap the + button to add your first book</div>
               </div>
@@ -689,7 +688,7 @@
                   <div style={{ flex: 1 }}>
                     <label style={S.label}>Format</label>
                     <div style={S.segmented}>
-                      {FORMATS.map(f => <button key={f} style={{...S.segBtn, ...(format === f ? S.segBtnActive : {})}} onClick={() => setFormat(f)}>{FORMAT_ICONS[f]} {f}</button>)}
+                      {FORMATS.map(f => <button key={f} style={{...S.segBtn, ...(format === f ? S.segBtnActive : {})}} onClick={() => setFormat(f)}>{f}</button>)}
                     </div>
                   </div>
                 </div>
@@ -739,7 +738,7 @@
                 <div style={S.formGroup}>
                   <label style={S.label}>Add to</label>
                   <div style={S.segmented}>
-                    {TABS.map(t => <button key={t.id} style={{...S.segBtn, ...(tab === t.id ? S.segBtnActive : {})}} onClick={() => !editingId && setTab(t.id)}>{t.icon} {t.label}</button>)}
+                    {TABS.map(t => <button key={t.id} style={{...S.segBtn, ...(tab === t.id ? S.segBtnActive : {})}} onClick={() => !editingId && setTab(t.id)}>{t.label}</button>)}
                   </div>
                 </div>
                 <button style={{...S.submitBtn, opacity: title.trim() ? 1 : 0.4, cursor: title.trim() ? "pointer" : "not-allowed"}} onClick={addBook} disabled={!title.trim()}>
@@ -752,7 +751,7 @@
           {/* Toast */}
           {toast && (
             <div style={{...S.toast, background: toast.type === "success" ? "#ECFDF5" : "#FFF8ED", borderColor: toast.type === "success" ? "#BBF7D0" : "#F0DFB8", color: toast.type === "success" ? "#166534" : "#B8860B"}}>
-              {toast.type === "success" ? "🔖 " : "ℹ️ "}{toast.text}
+              {toast.text}
             </div>
           )}
 
@@ -800,7 +799,7 @@
                   <div style={{ flex: 1 }}>
                     <label style={S.label}>Format</label>
                     <div style={S.segmented}>
-                      {FORMATS.map(f => <button key={f} style={{...S.segBtn, ...(bulkFormat === f ? S.segBtnActive : {})}} onClick={() => setBulkFormat(f)}>{FORMAT_ICONS[f]} {f}</button>)}
+                      {FORMATS.map(f => <button key={f} style={{...S.segBtn, ...(bulkFormat === f ? S.segBtnActive : {})}} onClick={() => setBulkFormat(f)}>{f}</button>)}
                     </div>
                   </div>
                 </div>
@@ -818,7 +817,7 @@
                 <div style={S.formGroup}>
                   <label style={S.label}>Add to</label>
                   <div style={S.segmented}>
-                    {TABS.map(t => <button key={t.id} style={{...S.segBtn, ...(bulkTab === t.id ? S.segBtnActive : {})}} onClick={() => setBulkTab(t.id)}>{t.icon} {t.label}</button>)}
+                    {TABS.map(t => <button key={t.id} style={{...S.segBtn, ...(bulkTab === t.id ? S.segBtnActive : {})}} onClick={() => setBulkTab(t.id)}>{t.label}</button>)}
                   </div>
                 </div>
                 <button style={{...S.submitBtn, opacity: bulkPreview.length > 0 ? 1 : 0.4, cursor: bulkPreview.length > 0 ? "pointer" : "not-allowed"}} onClick={submitBulk} disabled={bulkPreview.length === 0}>
