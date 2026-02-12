@@ -480,8 +480,7 @@
 
           {/* Search */}
           <div style={S.searchWrap}>
-            <span style={S.searchIcon}>Search</span>
-            <input style={S.searchInput} placeholder="Search your library or check if you've read something…" value={search} onChange={e => setSearch(e.target.value)} />
+            <input style={{...S.searchInput, paddingLeft: 14}} placeholder="Search your library or check if you've read something…" value={search} onChange={e => setSearch(e.target.value)} />
             {search && <button style={S.clearBtn} onClick={() => setSearch("")}>×</button>}
             <button style={S.bulkBtn} onClick={() => setShowBulk(true)} title="Bulk import">Import</button>
           </div>
