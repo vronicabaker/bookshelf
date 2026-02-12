@@ -704,12 +704,6 @@
                   </div>
                 </div>
                 </>)}
-                {(tab === "reading" || editingId) && (
-                  <div style={S.formGroup}>
-                    <label style={S.label}>Progress (optional)</label>
-                    <input style={S.input} placeholder="e.g. Chapter 12, 45%, 3h 20m in" value={progress} onChange={e => setProgress(e.target.value)} onKeyDown={e => e.key === "Enter" && addBook()} />
-                  </div>
-                )}
                 <div style={S.formGroup}>
                   <label style={S.label}>Tags</label>
                   <div style={S.tagSelector}>
