@@ -369,8 +369,8 @@
       };
 
       const editBook = (book) => {
-        setTitle(book.title); setAuthor(book.author); setCoverUrl(book.coverUrl || ""); setFormat(book.format);
-        setPlatform(book.platform); setProgress(book.progress || "");
+        setTitle(book.title); setAuthor(book.author); setCoverUrl(book.coverUrl || ""); setFormat(book.format || "Kindle");
+        setPlatform(book.platform || "Kindle"); setProgress(book.progress || "");
         setDateStarted(book.dateStarted || new Date().toISOString().slice(0, 10));
         setTags(book.tags || []);
         setEditingId(book.id); setShowAdd(true);
@@ -684,7 +684,7 @@
                   <label style={S.label}>{tab === "want" ? "Date Saved" : "Date Started"}</label>
                   <input type="date" style={S.dateInput} value={dateStarted} onChange={e => setDateStarted(e.target.value)} />
                 </div>
-                {tab !== "want" && (<>
+                {(tab !== "want" || editingId) && (<>
                 <div style={S.formRow}>
                   <div style={{ flex: 1 }}>
                     <label style={S.label}>Format</label>
