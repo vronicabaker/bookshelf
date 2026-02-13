@@ -488,11 +488,15 @@
             )
           ),
           book.synopsis && React.createElement("div", {
-            style: { ...S.synopsisWrap, ...(expandedSynopsis === book.id ? {} : { maxHeight: 38, overflow: "hidden" }) },
+            style: expandedSynopsis === book.id ? S.synopsisExpanded : S.synopsisCollapsed,
             onClick: () => setExpandedSynopsis(expandedSynopsis === book.id ? null : book.id)
           },
-            React.createElement("span", { style: S.synopsisText }, book.synopsis),
-            expandedSynopsis !== book.id && React.createElement("span", { style: S.synopsisMore }, "...more")
+            React.createElement("span", { style: S.synopsisText },
+              expandedSynopsis === book.id ? book.synopsis : book.synopsis.slice(0, 80) + (book.synopsis.length > 80 ? "..." : "")
+            ),
+            book.synopsis.length > 80 && React.createElement("span", { style: S.synopsisToggle },
+              expandedSynopsis === book.id ? "less" : "more"
+            )
           ),
           React.createElement("div", { style: S.moveRow },
             tab !== "reading" && React.createElement("button", { style: S.moveBtn, onClick: () => moveBook(book.id, tab, "reading") }, "Move to Reading"),
@@ -986,9 +990,10 @@
       genreTag: { fontSize: 10, fontWeight: 500, padding: "2px 8px", borderRadius: 12, background: "#C2785C12", color: "#C2785C", border: "1px solid #C2785C25" },
       coverImg: { width: 56, height: 84, objectFit: "cover", borderRadius: 6, flexShrink: 0, marginRight: 14, boxShadow: "0 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06)" },
       coverPreview: { width: 60, height: 90, objectFit: "cover", borderRadius: 6, marginTop: 8, boxShadow: "0 1px 4px rgba(0,0,0,0.1)" },
-      synopsisWrap: { position: "relative", padding: "8px 0 2px", cursor: "pointer", transition: "max-height 0.3s ease" },
-      synopsisText: { fontSize: 12, color: "#A8A29E", lineHeight: 1.5, fontStyle: "italic" },
-      synopsisMore: { fontSize: 11, color: "#C2785C", fontWeight: 500, marginLeft: 4 },
+      synopsisCollapsed: { padding: "6px 0 0", cursor: "pointer", display: "flex", alignItems: "baseline", gap: 4 },
+      synopsisExpanded: { padding: "8px 10px", marginTop: 6, cursor: "pointer", background: "#F7F5F2", borderRadius: 8, display: "flex", flexDirection: "column", gap: 4 },
+      synopsisText: { fontSize: 11, color: "#A8A29E", lineHeight: 1.45 },
+      synopsisToggle: { fontSize: 10, color: "#C2785C", fontWeight: 600, flexShrink: 0, letterSpacing: "0.02em" },
     };
 
     ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(BookTracker));
