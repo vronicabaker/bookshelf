@@ -108,6 +108,8 @@
       const [toast, setToast] = useState(null);
       const [urlParsed, setUrlParsed] = useState(null);
       const [tags, setTags] = useState([]);
+      const [synopsis, setSynopsis] = useState("");
+      const [expandedSynopsis, setExpandedSynopsis] = useState(null);
       const [customTagInput, setCustomTagInput] = useState("");
       const [customTags, setCustomTags] = useState([]);
       const touchRef = useRef({});
@@ -212,7 +214,7 @@
         const newBook = {
           id: Date.now(), title: title.trim(), author: author.trim(),
           format: tab === "want" ? "" : format, platform: tab === "want" ? "" : platform, progress: progress.trim(), dateStarted, tags: [...tags],
-          coverUrl: coverUrl.trim(),
+          coverUrl: coverUrl.trim(), synopsis: synopsis.trim(),
           addedAt: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
         };
         if (editingId) {
@@ -231,7 +233,7 @@
       const resetForm = () => {
         setTitle(""); setAuthor(""); setCoverUrl(""); setFormat("Kindle"); setPlatform("Kindle");
         setProgress(""); setDateStarted(new Date().toISOString().slice(0, 10));
-        setTags([]); setCustomTagInput("");
+        setTags([]); setCustomTagInput(""); setSynopsis("");
         setShowAdd(false); setEditingId(null);
       };
 
@@ -353,6 +355,40 @@
         input.click();
       };
 
+      // Import synopses from JSON file {title: synopsis}
+      const importSynopses = () => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json";
+        input.onchange = (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            try {
+              const synopses = JSON.parse(ev.target.result);
+              let matched = 0;
+              setBooks(prev => {
+                const updated = {};
+                for (const key in prev) {
+                  updated[key] = prev[key].map(b => {
+                    const match = Object.keys(synopses).find(t => t.toLowerCase() === b.title.toLowerCase());
+                    if (match && synopses[match]) { matched++; return { ...b, synopsis: synopses[match] }; }
+                    return b;
+                  });
+                }
+                setTimeout(() => setToast({ text: `Matched synopses for ${matched} books`, type: "success" }), 100);
+                return updated;
+              });
+            } catch (err) {
+              setToast({ text: "Could not read synopses file", type: "info" });
+            }
+          };
+          reader.readAsText(file);
+        };
+        input.click();
+      };
+
       const moveBook = (bookId, fromTab, toTab) => {
         const book = books[fromTab].find(b => b.id === bookId);
         if (!book) return;
@@ -373,6 +409,7 @@
         setPlatform(book.platform || "Kindle"); setProgress(book.progress || "");
         setDateStarted(book.dateStarted || new Date().toISOString().slice(0, 10));
         setTags(book.tags || []);
+        setSynopsis(book.synopsis || "");
         setEditingId(book.id); setShowAdd(true);
       };
 
@@ -450,6 +487,13 @@
                 : React.createElement("button", { style: { ...S.iconBtn, color: "#A8A29E" }, onClick: () => setConfirmDelete(book.id), title: "Delete" }, "×")
             )
           ),
+          book.synopsis && React.createElement("div", {
+            style: { ...S.synopsisWrap, ...(expandedSynopsis === book.id ? {} : { maxHeight: 38, overflow: "hidden" }) },
+            onClick: () => setExpandedSynopsis(expandedSynopsis === book.id ? null : book.id)
+          },
+            React.createElement("span", { style: S.synopsisText }, book.synopsis),
+            expandedSynopsis !== book.id && React.createElement("span", { style: S.synopsisMore }, "...more")
+          ),
           React.createElement("div", { style: S.moveRow },
             tab !== "reading" && React.createElement("button", { style: S.moveBtn, onClick: () => moveBook(book.id, tab, "reading") }, "Move to Reading"),
             tab !== "want" && React.createElement("button", { style: S.moveBtn, onClick: () => moveBook(book.id, tab, "want") }, "Move to Want"),
@@ -475,6 +519,7 @@
               <span style={S.statDivider}>·</span>
               <button style={S.dataBtn} onClick={exportLibrary} title="Export backup">Export</button>
               <button style={S.dataBtn} onClick={importLibrary} title="Import backup">Import</button>
+              <button style={S.dataBtn} onClick={importSynopses} title="Import synopses JSON">Synopses</button>
             </div>
           </div>
 
@@ -677,6 +722,10 @@
                   <label style={S.label}>Cover Image URL (optional)</label>
                   <input style={S.input} placeholder="Paste image link…" value={coverUrl} onChange={e => setCoverUrl(e.target.value)} />
                   {coverUrl.trim() && <img src={coverUrl} style={S.coverPreview} alt="Cover preview" onError={e => { e.target.style.display = "none"; }} />}
+                </div>
+                <div style={S.formGroup}>
+                  <label style={S.label}>Synopsis (optional)</label>
+                  <textarea style={{...S.input, minHeight: 70, resize: "vertical", lineHeight: 1.5, fontFamily: "'Outfit', sans-serif", fontSize: 13}} placeholder="Short description of the book..." value={synopsis} onChange={e => setSynopsis(e.target.value)} />
                 </div>
                 <div style={S.formGroup}>
                   <label style={S.label}>{tab === "want" ? "Date Saved" : "Date Started"}</label>
@@ -937,6 +986,9 @@
       genreTag: { fontSize: 10, fontWeight: 500, padding: "2px 8px", borderRadius: 12, background: "#C2785C12", color: "#C2785C", border: "1px solid #C2785C25" },
       coverImg: { width: 56, height: 84, objectFit: "cover", borderRadius: 6, flexShrink: 0, marginRight: 14, boxShadow: "0 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06)" },
       coverPreview: { width: 60, height: 90, objectFit: "cover", borderRadius: 6, marginTop: 8, boxShadow: "0 1px 4px rgba(0,0,0,0.1)" },
+      synopsisWrap: { position: "relative", padding: "8px 0 2px", cursor: "pointer", transition: "max-height 0.3s ease" },
+      synopsisText: { fontSize: 12, color: "#A8A29E", lineHeight: 1.5, fontStyle: "italic" },
+      synopsisMore: { fontSize: 11, color: "#C2785C", fontWeight: 500, marginLeft: 4 },
     };
 
     ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(BookTracker));
