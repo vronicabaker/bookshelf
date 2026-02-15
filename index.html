@@ -68,6 +68,71 @@
       });
     };
 
+    // ── Gist Sync ──
+    const GIST_TOKEN_KEY = "shelf-gist-token";
+    const GIST_ID_KEY = "shelf-gist-id";
+    const GIST_FILENAME = "bookshelf-data.json";
+
+    const getGistConfig = () => ({
+      token: localStorage.getItem(GIST_TOKEN_KEY),
+      gistId: localStorage.getItem(GIST_ID_KEY),
+    });
+
+    const saveGistConfig = (token, gistId) => {
+      localStorage.setItem(GIST_TOKEN_KEY, token);
+      localStorage.setItem(GIST_ID_KEY, gistId);
+    };
+
+    const clearGistConfig = () => {
+      localStorage.removeItem(GIST_TOKEN_KEY);
+      localStorage.removeItem(GIST_ID_KEY);
+    };
+
+    const gistFetch = async () => {
+      const { token, gistId } = getGistConfig();
+      if (!token || !gistId) return null;
+      try {
+        const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+          headers: { Authorization: `token ${token}`, Accept: "application/vnd.github.v3+json" },
+        });
+        if (!res.ok) return null;
+        const gist = await res.json();
+        const file = gist.files[GIST_FILENAME];
+        if (!file) return null;
+        return JSON.parse(file.content);
+      } catch (e) { console.error("Gist fetch failed:", e); return null; }
+    };
+
+    const gistPush = async (data) => {
+      const { token, gistId } = getGistConfig();
+      if (!token || !gistId) return false;
+      try {
+        const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+          method: "PATCH",
+          headers: { Authorization: `token ${token}`, Accept: "application/vnd.github.v3+json", "Content-Type": "application/json" },
+          body: JSON.stringify({ files: { [GIST_FILENAME]: { content: JSON.stringify(data, null, 2) } } }),
+        });
+        return res.ok;
+      } catch (e) { console.error("Gist push failed:", e); return false; }
+    };
+
+    const gistCreate = async (token) => {
+      try {
+        const res = await fetch("https://api.github.com/gists", {
+          method: "POST",
+          headers: { Authorization: `token ${token}`, Accept: "application/vnd.github.v3+json", "Content-Type": "application/json" },
+          body: JSON.stringify({
+            description: "bookshelf sync data",
+            public: false,
+            files: { [GIST_FILENAME]: { content: JSON.stringify({ reading: [], want: [], finished: [] }, null, 2) } },
+          }),
+        });
+        if (!res.ok) return null;
+        const gist = await res.json();
+        return gist.id;
+      } catch (e) { console.error("Gist create failed:", e); return null; }
+    };
+
     // ── Constants ──
     const FORMATS = ["Kindle", "Physical", "Audiobook"];
     const PLATFORMS = { Kindle: ["Kindle"], Physical: ["IRL"], Audiobook: ["Libby", "Spotify"] };
@@ -112,11 +177,26 @@
       const [expandedSynopsis, setExpandedSynopsis] = useState(null);
       const [customTagInput, setCustomTagInput] = useState("");
       const [customTags, setCustomTags] = useState([]);
+      const [showSyncSetup, setShowSyncSetup] = useState(false);
+      const [syncStatus, setSyncStatus] = useState("idle"); // idle, syncing, synced, error
+      const [syncConnected, setSyncConnected] = useState(() => {
+        const { token, gistId } = getGistConfig();
+        return !!(token && gistId);
+      });
+      const [syncTokenInput, setSyncTokenInput] = useState("");
+      const [syncGistIdInput, setSyncGistIdInput] = useState("");
+      const [syncStep, setSyncStep] = useState(() => {
+        const { token, gistId } = getGistConfig();
+        return (token && gistId) ? "connected" : "start";
+      });
+      const [syncError, setSyncError] = useState("");
+      const [syncWorking, setSyncWorking] = useState(false);
       const touchRef = useRef({});
       const inputRef = useRef(null);
       const bulkRef = useRef(null);
+      const syncDebounce = useRef(null);
 
-      // Load from IndexedDB
+      // Load from IndexedDB first, then overlay Gist data
       useEffect(() => {
         (async () => {
           try {
@@ -127,20 +207,42 @@
             const ct = await dbGet("shelf-custom-tags");
             if (ct && Array.isArray(ct)) setCustomTags(ct);
           } catch (e) {}
+          // Try loading from Gist
+          const { token, gistId } = getGistConfig();
+          if (token && gistId) {
+            setSyncStatus("syncing");
+            const gistData = await gistFetch();
+            if (gistData) {
+              if (gistData.books && gistData.books.reading && gistData.books.want && gistData.books.finished) {
+                setBooks(gistData.books);
+              }
+              if (gistData.customTags && Array.isArray(gistData.customTags)) {
+                setCustomTags(gistData.customTags);
+              }
+              setSyncStatus("synced");
+            } else {
+              setSyncStatus("error");
+            }
+          }
           setBooksLoaded(true);
         })();
       }, []);
 
-      // Save to IndexedDB
+      // Save to IndexedDB + Gist
       useEffect(() => {
         if (!booksLoaded) return;
         dbSet("shelf-books", books).catch(e => console.error("Save failed:", e));
-      }, [books, booksLoaded]);
-
-      useEffect(() => {
-        if (!booksLoaded) return;
         dbSet("shelf-custom-tags", customTags).catch(e => console.error("Save tags failed:", e));
-      }, [customTags, booksLoaded]);
+        // Debounced Gist push
+        if (syncConnected) {
+          if (syncDebounce.current) clearTimeout(syncDebounce.current);
+          syncDebounce.current = setTimeout(async () => {
+            setSyncStatus("syncing");
+            const ok = await gistPush({ books, customTags, lastUpdated: new Date().toISOString() });
+            setSyncStatus(ok ? "synced" : "error");
+          }, 1500);
+        }
+      }, [books, customTags, booksLoaded]);
 
       useEffect(() => { if (showAdd && inputRef.current) inputRef.current.focus(); }, [showAdd]);
       useEffect(() => { if (showBulk && bulkRef.current) bulkRef.current.focus(); }, [showBulk]);
@@ -389,6 +491,46 @@
         input.click();
       };
 
+      // Import tags from JSON file {title: ["tag1", "tag2"]}
+      const importTags = () => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json";
+        input.onchange = (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            try {
+              const tagMap = JSON.parse(ev.target.result);
+              let matched = 0;
+              const newCustom = new Set(customTags);
+              setBooks(prev => {
+                const updated = {};
+                for (const key in prev) {
+                  updated[key] = prev[key].map(b => {
+                    const match = Object.keys(tagMap).find(t => t.toLowerCase() === b.title.toLowerCase());
+                    if (match && Array.isArray(tagMap[match])) {
+                      matched++;
+                      tagMap[match].forEach(t => { if (!GENRES.includes(t)) newCustom.add(t); });
+                      return { ...b, tags: tagMap[match] };
+                    }
+                    return b;
+                  });
+                }
+                setTimeout(() => setToast({ text: `Tagged ${matched} books`, type: "success" }), 100);
+                return updated;
+              });
+              setCustomTags([...newCustom]);
+            } catch (err) {
+              setToast({ text: "Could not read tags file", type: "info" });
+            }
+          };
+          reader.readAsText(file);
+        };
+        input.click();
+      };
+
       const moveBook = (bookId, fromTab, toTab) => {
         const book = books[fromTab].find(b => b.id === bookId);
         if (!book) return;
@@ -524,6 +666,8 @@
               <button style={S.dataBtn} onClick={exportLibrary} title="Export backup">Export</button>
               <button style={S.dataBtn} onClick={importLibrary} title="Import backup">Import</button>
               <button style={S.dataBtn} onClick={importSynopses} title="Import synopses JSON">Synopses</button>
+              <button style={S.dataBtn} onClick={importTags} title="Import tags JSON">Tags</button>
+              <button style={{...S.dataBtn, color: syncConnected ? (syncStatus === "synced" ? "#16A34A" : syncStatus === "syncing" ? "#D97706" : syncStatus === "error" ? "#DC2626" : "#A8A29E") : "#A8A29E"}} onClick={() => setShowSyncSetup(true)} title="Sync settings">{syncConnected ? (syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync err" : "Synced") : "Sync"}</button>
             </div>
           </div>
 
@@ -878,6 +1022,115 @@
               </div>
             </div>
           )}
+
+          {/* Sync Setup Modal */}
+          {showSyncSetup && (() => {
+            const handleConnect = async () => {
+              if (!syncTokenInput.trim()) { setSyncError("Please enter a token."); return; }
+              setSyncWorking(true);
+              setSyncError("");
+              if (syncGistIdInput.trim()) {
+                saveGistConfig(syncTokenInput.trim(), syncGistIdInput.trim());
+                const data = await gistFetch();
+                if (data) {
+                  if (data.books && data.books.reading) setBooks(data.books);
+                  if (data.customTags) setCustomTags(data.customTags);
+                  setSyncConnected(true);
+                  setSyncStatus("synced");
+                  setSyncStep("connected");
+                  showToast("Connected and synced from Gist");
+                } else {
+                  clearGistConfig();
+                  setSyncError("Could not access that Gist. Check your token and Gist ID.");
+                }
+              } else {
+                const newId = await gistCreate(syncTokenInput.trim());
+                if (newId) {
+                  saveGistConfig(syncTokenInput.trim(), newId);
+                  await gistPush({ books, customTags, lastUpdated: new Date().toISOString() });
+                  setSyncConnected(true);
+                  setSyncStatus("synced");
+                  setSyncStep("connected");
+                  showToast("Gist created and library synced");
+                } else {
+                  setSyncError("Could not create Gist. Check that your token has 'gist' scope.");
+                }
+              }
+              setSyncWorking(false);
+            };
+
+            const handleDisconnect = () => {
+              clearGistConfig();
+              setSyncConnected(false);
+              setSyncStatus("idle");
+              setSyncStep("start");
+              setSyncTokenInput("");
+              setSyncGistIdInput("");
+              showToast("Sync disconnected");
+            };
+
+            const handleForceSync = async () => {
+              setSyncWorking(true);
+              setSyncStatus("syncing");
+              const ok = await gistPush({ books, customTags, lastUpdated: new Date().toISOString() });
+              setSyncStatus(ok ? "synced" : "error");
+              showToast(ok ? "Library pushed to Gist" : "Sync failed");
+              setSyncWorking(false);
+            };
+
+            const handleForcePull = async () => {
+              setSyncWorking(true);
+              setSyncStatus("syncing");
+              const data = await gistFetch();
+              if (data && data.books) {
+                setBooks(data.books);
+                if (data.customTags) setCustomTags(data.customTags);
+                setSyncStatus("synced");
+                showToast("Library pulled from Gist");
+              } else {
+                setSyncStatus("error");
+                showToast("Pull failed");
+              }
+              setSyncWorking(false);
+            };
+
+            const currentGistId = getGistConfig().gistId;
+
+            return React.createElement("div", { style: S.overlay, onClick: () => setShowSyncSetup(false) },
+              React.createElement("div", { style: {...S.modal, maxWidth: 420}, onClick: e => e.stopPropagation() },
+                React.createElement("div", { style: S.modalHeader },
+                  React.createElement("span", { style: S.modalTitle }, "Sync Settings"),
+                  React.createElement("button", { style: S.closeBtn, onClick: () => setShowSyncSetup(false) }, "x")
+                ),
+                syncStep === "connected" ? React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } },
+                  React.createElement("div", { style: { fontSize: 13, color: "#57534E", lineHeight: 1.5 } },
+                    "Connected to Gist. Your library auto-syncs across devices."
+                  ),
+                  React.createElement("div", { style: { fontSize: 11, color: "#A8A29E", wordBreak: "break-all" } }, "Gist ID: " + currentGistId),
+                  React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 4 } },
+                    React.createElement("button", { style: {...S.moveBtn, flex: 1, opacity: syncWorking ? 0.5 : 1}, onClick: handleForceSync, disabled: syncWorking }, "Push to Gist"),
+                    React.createElement("button", { style: {...S.moveBtn, flex: 1, opacity: syncWorking ? 0.5 : 1}, onClick: handleForcePull, disabled: syncWorking }, "Pull from Gist")
+                  ),
+                  React.createElement("button", { style: {...S.moveBtn, color: "#DC2626", borderColor: "#FECACA", marginTop: 4}, onClick: handleDisconnect }, "Disconnect")
+                ) : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } },
+                  React.createElement("div", { style: { fontSize: 13, color: "#57534E", lineHeight: 1.6 } },
+                    "Sync your library across devices using a private GitHub Gist."
+                  ),
+                  React.createElement("div", { style: { fontSize: 12, color: "#78716C", lineHeight: 1.5, background: "#F7F5F2", borderRadius: 8, padding: "10px 12px" } },
+                    "1. Go to github.com/settings/tokens",
+                    React.createElement("br"),
+                    '2. Generate a token with "gist" scope',
+                    React.createElement("br"),
+                    "3. Paste it below"
+                  ),
+                  React.createElement("input", { style: S.input, placeholder: "GitHub Personal Access Token", value: syncTokenInput, onChange: e => setSyncTokenInput(e.target.value), type: "password" }),
+                  React.createElement("input", { style: S.input, placeholder: "Existing Gist ID (leave blank to create new)", value: syncGistIdInput, onChange: e => setSyncGistIdInput(e.target.value) }),
+                  syncError && React.createElement("div", { style: { fontSize: 12, color: "#DC2626" } }, syncError),
+                  React.createElement("button", { style: {...S.submitBtn, opacity: syncWorking ? 0.5 : 1}, onClick: handleConnect, disabled: syncWorking }, syncWorking ? "Connecting..." : "Connect")
+                )
+              )
+            );
+          })()}
         </div>
       );
     }
