@@ -623,7 +623,7 @@
               React.createElement("div", { style: S.bookTitle }, book.title),
               React.createElement("div", { style: S.authorRow },
                 book.author && React.createElement("span", { style: S.bookAuthor }, book.author),
-                book.platform && React.createElement("span", { style: { ...S.platformTagInline, background: PLATFORM_COLORS[book.platform] + "15", color: PLATFORM_COLORS[book.platform], borderColor: PLATFORM_COLORS[book.platform] + "30" } }, book.platform)
+                (book.format || book.platform) && React.createElement("span", { style: { ...S.platformTagInline, background: (PLATFORM_COLORS[book.platform] || "#A8A29E") + "15", color: PLATFORM_COLORS[book.platform] || "#A8A29E", borderColor: (PLATFORM_COLORS[book.platform] || "#A8A29E") + "30" } }, [book.format, book.platform].filter(Boolean).join(" · "))
               ),
               (book.tags && book.tags.length > 0 || book.dateStarted) && React.createElement("div", { style: S.bookMeta },
                 book.tags && book.tags.length > 0 && book.tags.map(t => React.createElement("span", { key: t, style: S.genreTag }, t)),
