@@ -773,7 +773,6 @@
                           onMouseLeave={() => { if (touchRef.current[book.id]?.mouseDown) handleMouseUp(book.id, book); }}
                         >
                           <div style={S.searchResultLeft}>
-                            <span style={S.formatBadge}>{(book.format || "?")[0]}</span>
                             <div>
                               <div style={S.searchResultTitle}>{book.title}</div>
                               <div style={S.searchResultAuthor}>{book.author}</div>
