@@ -134,15 +134,15 @@
     };
 
     // ── Constants ──
-    const FORMATS = ["Kindle", "Physical", "Audiobook"];
-    const PLATFORMS = { Kindle: ["Kindle"], Physical: ["IRL"], Audiobook: ["Libby", "Spotify"] };
+    const FORMATS = ["Audiobook", "Ebook", "Physical"];
+    const PLATFORMS = { Audiobook: ["Libby", "Audible", "Spotify"], Ebook: ["Kindle", "Libby"], Physical: ["Owned", "Loaned"] };
     const TABS = [
       { id: "reading", label: "Currently Reading", icon: "" },
       { id: "want", label: "Want to Read", icon: "" },
       { id: "finished", label: "Finished", icon: "" },
     ];
-    const FORMAT_ICONS = { Kindle: "", Physical: "", Audiobook: "" };
-    const PLATFORM_COLORS = { Kindle: "#D97706", IRL: "#8B7355", Libby: "#DC2626", Spotify: "#16A34A" };
+    const FORMAT_ICONS = { Audiobook: "", Ebook: "", Physical: "" };
+    const PLATFORM_COLORS = { Kindle: "#D97706", Libby: "#DC2626", Audible: "#F59E0B", Spotify: "#16A34A", Owned: "#8B7355", Loaned: "#6B7280" };
     const GENRES = ["Thriller", "Romance", "Sci-Fi", "Fantasy", "Mystery", "Horror", "Literary Fiction", "Historical Fiction", "Non-Fiction", "Self-Help", "Memoir", "Biography", "True Crime"];
     const initialBooks = { reading: [], want: [], finished: [] };
 
@@ -155,7 +155,7 @@
       const [title, setTitle] = useState("");
       const [author, setAuthor] = useState("");
       const [coverUrl, setCoverUrl] = useState("");
-      const [format, setFormat] = useState("Kindle");
+      const [format, setFormat] = useState("Ebook");
       const [platform, setPlatform] = useState("Kindle");
       const [progress, setProgress] = useState("");
       const [dateStarted, setDateStarted] = useState(() => new Date().toISOString().slice(0, 10));
@@ -165,7 +165,7 @@
       const [sortBy, setSortBy] = useState("date-desc");
       const [groupBy, setGroupBy] = useState("none");
       const [bulkText, setBulkText] = useState("");
-      const [bulkFormat, setBulkFormat] = useState("Kindle");
+      const [bulkFormat, setBulkFormat] = useState("Ebook");
       const [bulkPlatform, setBulkPlatform] = useState("Kindle");
       const [bulkTab, setBulkTab] = useState("reading");
       const [bulkPreview, setBulkPreview] = useState([]);
@@ -196,12 +196,25 @@
       const bulkRef = useRef(null);
       const syncDebounce = useRef(null);
 
+      // Migrate old format/platform values
+      const migrateBook = (b) => {
+        let book = { ...b };
+        if (book.format === "Kindle") { book.format = "Ebook"; book.platform = book.platform || "Kindle"; }
+        if (book.platform === "IRL") { book.platform = "Owned"; }
+        return book;
+      };
+      const migrateBooks = (data) => ({
+        reading: data.reading.map(migrateBook),
+        want: data.want.map(migrateBook),
+        finished: data.finished.map(migrateBook),
+      });
+
       // Load from IndexedDB first, then overlay Gist data
       useEffect(() => {
         (async () => {
           try {
             const data = await dbGet("shelf-books");
-            if (data && data.reading && data.want && data.finished) setBooks(data);
+            if (data && data.reading && data.want && data.finished) setBooks(migrateBooks(data));
           } catch (e) {}
           try {
             const ct = await dbGet("shelf-custom-tags");
@@ -214,7 +227,7 @@
             const gistData = await gistFetch();
             if (gistData) {
               if (gistData.books && gistData.books.reading && gistData.books.want && gistData.books.finished) {
-                setBooks(gistData.books);
+                setBooks(migrateBooks(gistData.books));
               }
               if (gistData.customTags && Array.isArray(gistData.customTags)) {
                 setCustomTags(gistData.customTags);
@@ -333,7 +346,7 @@
       };
 
       const resetForm = () => {
-        setTitle(""); setAuthor(""); setCoverUrl(""); setFormat("Kindle"); setPlatform("Kindle");
+        setTitle(""); setAuthor(""); setCoverUrl(""); setFormat("Ebook"); setPlatform("Kindle");
         setProgress(""); setDateStarted(new Date().toISOString().slice(0, 10));
         setTags([]); setCustomTagInput(""); setSynopsis("");
         setShowAdd(false); setEditingId(null);
@@ -547,7 +560,7 @@
       };
 
       const editBook = (book) => {
-        setTitle(book.title); setAuthor(book.author); setCoverUrl(book.coverUrl || ""); setFormat(book.format || "Kindle");
+        setTitle(book.title); setAuthor(book.author); setCoverUrl(book.coverUrl || ""); setFormat(book.format || "Ebook");
         setPlatform(book.platform || "Kindle"); setProgress(book.progress || "");
         setDateStarted(book.dateStarted || new Date().toISOString().slice(0, 10));
         setTags(book.tags || []);
@@ -608,11 +621,11 @@
             book.coverUrl && React.createElement("img", { src: book.coverUrl, style: S.coverImg, alt: book.title, onError: (e) => { e.target.style.display = "none"; } }),
             React.createElement("div", { style: S.bookInfo },
               React.createElement("div", { style: S.bookTitle }, book.title),
-              book.author && React.createElement("div", { style: S.bookAuthor }, book.author),
-              React.createElement("div", { style: S.bookMeta },
-                book.platform && React.createElement("span", { style: { ...S.platformTag, background: PLATFORM_COLORS[book.platform] + "15", color: PLATFORM_COLORS[book.platform], borderColor: PLATFORM_COLORS[book.platform] + "30" } },
-                  (FORMAT_ICONS[book.format] ? FORMAT_ICONS[book.format] + " " : "") + book.platform
-                ),
+              React.createElement("div", { style: S.authorRow },
+                book.author && React.createElement("span", { style: S.bookAuthor }, book.author),
+                book.platform && React.createElement("span", { style: { ...S.platformTagInline, background: PLATFORM_COLORS[book.platform] + "15", color: PLATFORM_COLORS[book.platform], borderColor: PLATFORM_COLORS[book.platform] + "30" } }, book.platform)
+              ),
+              (book.tags && book.tags.length > 0 || book.dateStarted) && React.createElement("div", { style: S.bookMeta },
                 book.tags && book.tags.length > 0 && book.tags.map(t => React.createElement("span", { key: t, style: S.genreTag }, t)),
                 book.dateStarted && React.createElement("span", { style: S.dateTag },
                   (tab === "want" ? "Saved " : "Started ") + new Date(book.dateStarted + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -1176,11 +1189,13 @@
       bookTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 },
       bookInfo: { flex: 1, paddingRight: 12 },
       bookTitle: { fontFamily: "'Libre Baskerville', serif", fontSize: 16, fontWeight: 400, color: "#1C1917", lineHeight: 1.35 },
-      bookAuthor: { fontSize: 13, color: "#A8A29E", marginTop: 2, fontStyle: "italic" },
+      bookAuthor: { fontSize: 13, color: "#A8A29E", fontStyle: "italic" },
+      authorRow: { display: "flex", alignItems: "center", gap: 8, marginTop: 2 },
+      platformTagInline: { fontSize: 10, fontWeight: 500, padding: "1px 7px", borderRadius: 10, border: "1px solid", letterSpacing: "0.02em", whiteSpace: "nowrap" },
       bookActions: { display: "flex", gap: 2, alignItems: "flex-start", paddingTop: 2 },
       iconBtn: { background: "none", border: "none", color: "#A8A29E", fontSize: 15, cursor: "pointer", padding: "4px 6px", borderRadius: 6, transition: "color 0.15s" },
       confirmRow: { display: "flex", gap: 2, fontSize: 12 },
-      bookMeta: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 8 },
+      bookMeta: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 6 },
       platformTag: { fontSize: 11, fontWeight: 500, padding: "3px 9px", borderRadius: 16, border: "1px solid", letterSpacing: "0.02em" },
       progressTag: { fontSize: 11, color: "#78716C", background: "#F5F3F0", padding: "3px 9px", borderRadius: 16, fontWeight: 500 },
       dateTag: { fontSize: 11, color: "#A8A29E", marginLeft: "auto" },
