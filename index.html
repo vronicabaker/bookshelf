@@ -705,16 +705,14 @@
 
                 if (finishedMatch.length > 0) return (
                   <div style={S.readCheckBanner}>
-                    <div style={S.readCheckIcon}>done</div>
                     <div style={S.readCheckContent}>
-                      <div style={S.readCheckTitle}>Yes, you've read {finishedMatch.length === 1 ? "this" : "these"}!</div>
+                      <div style={S.readCheckTitle}>Yes, you've read {finishedMatch.length === 1 ? "this" : "these"}</div>
                       <div style={S.readCheckBooks}>{finishedMatch.map(b => <span key={b.id} style={S.readCheckBookName}>{b.title}{b.author ? ` — ${b.author}` : ""}</span>)}</div>
                     </div>
                   </div>
                 );
                 if (readingMatch.length > 0) return (
                   <div style={{...S.readCheckBanner, background: "#FFF8ED", borderColor: "#F0DFB8"}}>
-                    <div style={{...S.readCheckIcon, background: "#FFF0D4", color: "#B8860B"}}>!</div>
                     <div style={S.readCheckContent}>
                       <div style={{...S.readCheckTitle, color: "#B8860B"}}>You're reading {readingMatch.length === 1 ? "this" : "these"} now</div>
                       <div style={S.readCheckBooks}>{readingMatch.map(b => <span key={b.id} style={S.readCheckBookName}>{b.title}{b.progress ? ` (${b.progress})` : ""}</span>)}</div>
@@ -723,7 +721,6 @@
                 );
                 if (wantMatch.length > 0) return (
                   <div style={{...S.readCheckBanner, background: "#F0F4FF", borderColor: "#D0DBFF"}}>
-                    <div style={{...S.readCheckIcon, background: "#E0E8FF", color: "#4A6FA5"}}>+</div>
                     <div style={S.readCheckContent}>
                       <div style={{...S.readCheckTitle, color: "#4A6FA5"}}>On your Want to Read list</div>
                       <div style={S.readCheckBooks}>{wantMatch.map(b => <span key={b.id} style={S.readCheckBookName}>{b.title}{b.author ? ` — ${b.author}` : ""}</span>)}</div>
@@ -732,7 +729,6 @@
                 );
                 if (!hasAny && search.trim().length >= 2) return (
                   <div style={{...S.readCheckBanner, background: "#F5F3F0", borderColor: "#E5E0DA"}}>
-                    <div style={{...S.readCheckIcon, background: "#EBE7E2", color: "#A8A29E"}}>✗</div>
                     <div style={S.readCheckContent}>
                       <div style={{...S.readCheckTitle, color: "#78716C"}}>Not in your library</div>
                       <div style={{...S.readCheckBooks, color: "#A8A29E"}}>No match for "{search}" in any of your lists</div>
@@ -755,7 +751,6 @@
 
               {!urlParsed && searchResults.length === 0 ? (
                 <div style={S.noResults}>
-                  <span style={{ fontSize: 20 }}>🔍</span>
                   <span>No books found matching "{search}"</span>
                   <button style={S.quickAddBtn} onClick={() => quickSaveToWant(search, "")}>
                     Quick save "{search.length > 30 ? search.slice(0, 30) + "…" : search}" to Want to Read
@@ -763,7 +758,6 @@
                 </div>
               ) : !urlParsed && (
                 <>
-                  <div style={S.swipeHint}>← swipe left to save to Want to Read</div>
                   {searchResults.map(book => {
                     const swipeX = swipeStates[book.id] || 0;
                     const isRevealed = swipeX > 70;
