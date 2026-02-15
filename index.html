@@ -2,22 +2,23 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="bookshelf" />
-  <meta name="theme-color" content="#F7F5F2" />
+  <meta name="theme-color" content="#F7F5F0" />
   <title>bookshelf</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Karla:wght@300;400;500&family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; }
-    body { background: #F7F5F2; font-family: 'Outfit', sans-serif; -webkit-font-smoothing: antialiased; }
-    input::placeholder { color: #A8A29E; }
-    textarea::placeholder { color: #A8A29E; }
-    input:focus, select:focus, textarea:focus { outline: none; border-color: #D4CFC8 !important; }
+    body { background: #F7F5F0; font-family: 'Karla', sans-serif; -webkit-font-smoothing: antialiased; color: #1A1917; }
+    ::selection { background: #8C857A; color: #fff; }
+    input::placeholder { color: #A09B93; }
+    textarea::placeholder { color: #A09B93; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #A09B93 !important; }
     @keyframes slideUp {
       from { opacity: 0; transform: translateY(12px); }
       to { opacity: 1; transform: translateY(0); }
@@ -178,6 +179,7 @@
       const [customTagInput, setCustomTagInput] = useState("");
       const [customTags, setCustomTags] = useState([]);
       const [showSyncSetup, setShowSyncSetup] = useState(false);
+      const [showSettings, setShowSettings] = useState(false);
       const [syncStatus, setSyncStatus] = useState("idle"); // idle, syncing, synced, error
       const [syncConnected, setSyncConnected] = useState(() => {
         const { token, gistId } = getGistConfig();
@@ -666,17 +668,22 @@
         <div style={S.container}>
           {/* Header */}
           <div style={S.header}>
-            <div style={S.headerLeft}>
-              <h1 style={S.logo}>bookshelf</h1>
-            </div>
-            <div style={S.stats}>
-              <button style={S.dataBtn} onClick={exportLibrary} title="Export backup">Export</button>
-              <button style={S.dataBtn} onClick={importLibrary} title="Import backup">Import</button>
-              <button style={S.dataBtn} onClick={importSynopses} title="Import synopses JSON">Synopses</button>
-              <button style={S.dataBtn} onClick={importTags} title="Import tags JSON">Tags</button>
-              <button style={{...S.dataBtn, color: syncConnected ? (syncStatus === "synced" ? "#16A34A" : syncStatus === "syncing" ? "#D97706" : syncStatus === "error" ? "#DC2626" : "#A8A29E") : "#A8A29E"}} onClick={() => setShowSyncSetup(true)} title="Sync settings">{syncConnected ? (syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync err" : "Synced") : "Sync"}</button>
+            <h1 style={S.logo}>bookshelf</h1>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", position: "relative" }}>
+              {syncConnected && <span style={{ fontSize: 10, color: syncStatus === "synced" ? "#16A34A" : syncStatus === "syncing" ? "#D97706" : syncStatus === "error" ? "#DC2626" : "#A8A29E", fontWeight: 500 }}>{syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync error" : ""}</span>}
+              <button style={S.headerIcon} onClick={() => setShowSettings(!showSettings)} title="Settings">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              </button>
+              {showSettings && React.createElement("div", { style: S.settingsMenu },
+                React.createElement("button", { style: S.settingsItem, onClick: () => { exportLibrary(); setShowSettings(false); } }, "Export backup"),
+                React.createElement("button", { style: S.settingsItem, onClick: () => { importLibrary(); setShowSettings(false); } }, "Import backup"),
+                React.createElement("button", { style: S.settingsItem, onClick: () => { importSynopses(); setShowSettings(false); } }, "Import synopses"),
+                React.createElement("button", { style: S.settingsItem, onClick: () => { importTags(); setShowSettings(false); } }, "Import tags"),
+                React.createElement("button", { style: S.settingsItem, onClick: () => { setShowSyncSetup(true); setShowSettings(false); } }, syncConnected ? "Sync settings" : "Set up sync")
+              )}
             </div>
           </div>
+          {showSettings && React.createElement("div", { style: S.settingsBackdrop, onClick: () => setShowSettings(false) })}
 
           {/* Search */}
           <div style={S.searchWrap}>
@@ -793,39 +800,33 @@
             </div>
           )}
 
-          {/* Tabs */}
-          <div style={S.tabs}>
-            {TABS.map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)} style={{...S.tab, ...(tab === t.id ? S.tabActive : {})}}>
-                <span>{t.label}</span>
-                <span style={{...S.tabCount, ...(tab === t.id ? S.tabCountActive : {})}}>{books[t.id].length}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Sort & Group */}
-          <div style={S.controls}>
-            <div style={S.controlGroup}>
-              <span style={S.controlLabel}>Sort</span>
-              <select style={S.controlSelect} value={sortBy} onChange={e => setSortBy(e.target.value)}>
-                <option value="date-desc">Date (newest)</option>
-                <option value="date-asc">Date (oldest)</option>
-                <option value="title-asc">Title (A→Z)</option>
-                <option value="title-desc">Title (Z→A)</option>
-                <option value="author-asc">Author (A→Z)</option>
-                <option value="author-desc">Author (Z→A)</option>
-              </select>
+          {/* Nav Bar */}
+          <div style={S.navBar}>
+            <div style={S.navTabs}>
+              {TABS.map(t => (
+                <button key={t.id} onClick={() => setTab(t.id)} style={{...S.navTab, ...(tab === t.id ? S.navTabActive : {})}}>
+                  {t.label.toUpperCase()}
+                </button>
+              ))}
             </div>
-            <div style={S.controlGroup}>
-              <span style={S.controlLabel}>Group</span>
-              <select style={S.controlSelect} value={groupBy} onChange={e => setGroupBy(e.target.value)}>
-                <option value="none">None</option>
-                <option value="author">Author</option>
-                <option value="format">Format</option>
-                <option value="tag">Tag</option>
+            <div style={S.navControls}>
+              <select style={S.navSelect} value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                <option value="date-desc">Newest</option>
+                <option value="date-asc">Oldest</option>
+                <option value="title-asc">Title A→Z</option>
+                <option value="title-desc">Title Z→A</option>
+                <option value="author-asc">Author A→Z</option>
+                <option value="author-desc">Author Z→A</option>
+              </select>
+              <select style={S.navSelect} value={groupBy} onChange={e => setGroupBy(e.target.value)}>
+                <option value="none">No grouping</option>
+                <option value="author">By Author</option>
+                <option value="format">By Format</option>
+                <option value="tag">By Tag</option>
               </select>
             </div>
           </div>
+          <div style={S.navCountLine}>{books[tab].length} {books[tab].length === 1 ? "BOOK" : "BOOKS"}</div>
 
           {/* Book list */}
           <div style={S.bookList}>
@@ -880,7 +881,7 @@
                 </div>
                 <div style={S.formGroup}>
                   <label style={S.label}>Synopsis (optional)</label>
-                  <textarea style={{...S.input, minHeight: 70, resize: "vertical", lineHeight: 1.5, fontFamily: "'Outfit', sans-serif", fontSize: 13}} placeholder="Short description of the book..." value={synopsis} onChange={e => setSynopsis(e.target.value)} />
+                  <textarea style={{...S.input, minHeight: 70, resize: "vertical", lineHeight: 1.5, fontFamily: "'Karla', sans-serif", fontSize: 13}} placeholder="Short description of the book..." value={synopsis} onChange={e => setSynopsis(e.target.value)} />
                 </div>
                 <div style={S.formGroup}>
                   <label style={S.label}>{tab === "want" ? "Date Saved" : "Date Started"}</label>
@@ -1123,7 +1124,7 @@
                   React.createElement("div", { style: { fontSize: 13, color: "#57534E", lineHeight: 1.6 } },
                     "Sync your library across devices using a private GitHub Gist."
                   ),
-                  React.createElement("div", { style: { fontSize: 12, color: "#78716C", lineHeight: 1.5, background: "#F7F5F2", borderRadius: 8, padding: "10px 12px" } },
+                  React.createElement("div", { style: { fontSize: 12, color: "#78716C", lineHeight: 1.5, background: "#F7F5F0", borderRadius: 8, padding: "10px 12px" } },
                     "1. Go to github.com/settings/tokens",
                     React.createElement("br"),
                     '2. Generate a token with "gist" scope',
@@ -1144,45 +1145,42 @@
 
     // ── Styles ──
     const S = {
-      container: { fontFamily: "'Outfit', sans-serif", background: "#F7F5F2", minHeight: "100vh", color: "#44403C", padding: "28px 24px 100px", maxWidth: 800, margin: "0 auto" },
-      header: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 24, paddingBottom: 16, borderBottom: "1px solid #E7E2DC" },
+      container: { fontFamily: "'Karla', sans-serif", background: "#F7F5F0", minHeight: "100vh", color: "#1A1917", padding: "calc(28px + env(safe-area-inset-top)) 24px calc(100px + env(safe-area-inset-bottom))", maxWidth: 800, margin: "0 auto" },
+      header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 0 },
       headerLeft: { display: "flex", flexDirection: "column", gap: 2 },
-      logo: { fontFamily: "'Libre Baskerville', serif", fontSize: 30, fontWeight: 400, color: "#1C1917", letterSpacing: "-0.01em", lineHeight: 1 },
-      stats: { display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "#A8A29E" },
-      statItem: { display: "flex", gap: 4, alignItems: "center" },
-      statNum: { color: "#57534E", fontWeight: 600 },
-      statDivider: { color: "#D6D3D1" },
-      dataBtn: { background: "none", border: "1px solid #E7E2DC", borderRadius: 6, color: "#A8A29E", fontSize: 11, fontFamily: "'Outfit', sans-serif", fontWeight: 500, cursor: "pointer", padding: "3px 8px", transition: "all 0.15s", whiteSpace: "nowrap" },
+      logo: { fontFamily: "'Cormorant Garamond', serif", fontSize: 24, fontWeight: 400, color: "#1A1917", letterSpacing: "-0.5px", lineHeight: 1 },
+      headerIcon: { background: "none", border: "none", color: "#1A1917", cursor: "pointer", padding: 4, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", transition: "color 0.15s" },
+      dataBtn: { background: "none", border: "1px solid #DDD8D0", borderRadius: 6, color: "#A8A29E", fontSize: 11, fontFamily: "'Karla', sans-serif", fontWeight: 500, cursor: "pointer", padding: "3px 8px", transition: "all 0.15s", whiteSpace: "nowrap" },
+      settingsMenu: { position: "absolute", top: "calc(100% + 8px)", right: 0, background: "#FFFEF9", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 12, padding: 6, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", zIndex: 100, minWidth: 170, animation: "fadeIn 0.15s ease" },
+      settingsItem: { display: "block", width: "100%", background: "none", border: "none", padding: "10px 14px", fontSize: 13, fontFamily: "'Karla', sans-serif", color: "#1A1917", cursor: "pointer", textAlign: "left", borderRadius: 8, transition: "background 0.15s" },
+      settingsBackdrop: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 },
       searchWrap: { position: "relative", marginBottom: 16, display: "flex", gap: 8, alignItems: "center" },
       searchIcon: { position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", fontSize: 16, color: "#A8A29E", pointerEvents: "none" },
-      searchInput: { flex: 1, padding: "11px 40px 11px 40px", background: "#FFFFFF", border: "1px solid #E7E2DC", borderRadius: 10, color: "#1C1917", fontSize: 14, fontFamily: "'Outfit', sans-serif", transition: "border-color 0.2s" },
-      bulkBtn: { padding: "11px 14px", background: "#FFFFFF", border: "1px solid #E7E2DC", borderRadius: 10, color: "#78716C", fontSize: 12, fontFamily: "'Outfit', sans-serif", fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.15s", letterSpacing: "0.02em" },
+      searchInput: { flex: 1, padding: "11px 40px 11px 40px", background: "#FFFEF9", border: "1px solid #DDD8D0", borderRadius: 10, color: "#1C1917", fontSize: 14, fontFamily: "'Karla', sans-serif", transition: "border-color 0.2s" },
+      bulkBtn: { padding: "11px 14px", background: "#FFFEF9", border: "1px solid #DDD8D0", borderRadius: 10, color: "#78716C", fontSize: 12, fontFamily: "'Karla', sans-serif", fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.15s", letterSpacing: "0.02em" },
       clearBtn: { position: "absolute", right: 96, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#A8A29E", fontSize: 18, cursor: "pointer", padding: "4px 8px" },
-      searchResults: { background: "#FFFFFF", border: "1px solid #E7E2DC", borderRadius: 12, padding: 6, marginBottom: 16, animation: "fadeIn 0.2s ease", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" },
-      searchResultItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderRadius: 8, transition: "background 0.15s", cursor: "default", background: "#FFFFFF", position: "relative", zIndex: 1, userSelect: "none" },
+      searchResults: { background: "#FFFEF9", border: "1px solid #DDD8D0", borderRadius: 12, padding: 6, marginBottom: 16, animation: "fadeIn 0.2s ease", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" },
+      searchResultItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderRadius: 8, transition: "background 0.15s", cursor: "default", background: "#FFFEF9", position: "relative", zIndex: 1, userSelect: "none" },
       searchResultLeft: { display: "flex", gap: 10, alignItems: "center" },
       searchResultTitle: { fontSize: 14, fontWeight: 500, color: "#1C1917" },
       searchResultAuthor: { fontSize: 12, color: "#A8A29E", marginTop: 1 },
       formatBadge: { fontSize: 16, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "#F5F3F0", borderRadius: 8 },
       statusBadge: { fontSize: 10, fontWeight: 600, padding: "4px 9px", borderRadius: 20, letterSpacing: "0.04em", textTransform: "uppercase", whiteSpace: "nowrap" },
       noResults: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "20px 16px", color: "#78716C", fontSize: 14 },
-      tabs: { display: "flex", gap: 4, marginBottom: 16 },
-      tab: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "9px 6px", background: "transparent", border: "1px solid #E7E2DC", borderRadius: 9, color: "#A8A29E", fontSize: 12, fontFamily: "'Outfit', sans-serif", fontWeight: 500, cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap" },
-      tabActive: { background: "#FFFFFF", color: "#1C1917", borderColor: "#D4CFC8", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" },
-      tabIcon: { fontSize: 13 },
-      tabCount: { fontSize: 10, fontWeight: 600, background: "#F0EDE8", color: "#A8A29E", padding: "2px 6px", borderRadius: 8 },
-      tabCountActive: { background: "#E7E2DC", color: "#57534E" },
-      controls: { display: "flex", gap: 10, marginBottom: 14, alignItems: "center" },
-      controlGroup: { display: "flex", alignItems: "center", gap: 6 },
-      controlLabel: { fontSize: 11, color: "#A8A29E", fontWeight: 500, letterSpacing: "0.03em" },
-      controlSelect: { padding: "5px 8px", background: "#FFFFFF", border: "1px solid #E7E2DC", borderRadius: 7, color: "#57534E", fontSize: 12, fontFamily: "'Outfit', sans-serif", fontWeight: 500, cursor: "pointer", outline: "none" },
+      navBar: { display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(0,0,0,0.06)", marginBottom: 16, gap: 12, padding: "4px 0 8px" },
+      navTabs: { display: "flex", gap: 0 },
+      navTab: { background: "none", border: "none", borderBottom: "2px solid transparent", padding: "8px 14px 8px 0", color: "#B5AFA7", fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", fontWeight: 400, cursor: "pointer", letterSpacing: "1.5px", transition: "all 0.2s", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", textTransform: "uppercase" },
+      navTabActive: { color: "#1A1917", borderBottomColor: "#1A1917" },
+      navCountLine: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, letterSpacing: "2px", color: "#A09B93", padding: "8px 0 12px" },
+      navControls: { display: "flex", gap: 6, alignItems: "center", flexShrink: 0 },
+      navSelect: { background: "transparent", border: "1px solid #DDD8D0", borderRadius: 20, padding: "5px 10px", fontSize: 11, fontFamily: "'Karla', sans-serif", color: "#9A958D", cursor: "pointer", fontWeight: 400 },
       groupHeader: { fontSize: 12, fontWeight: 600, color: "#78716C", textTransform: "uppercase", letterSpacing: "0.06em", padding: "16px 0 6px", display: "flex", alignItems: "center", gap: 8 },
       groupCount: { fontSize: 10, fontWeight: 600, background: "#F0EDE8", color: "#A8A29E", padding: "2px 6px", borderRadius: 8 },
       bookList: { display: "flex", flexDirection: "column", gap: 8 },
-      bookCard: { background: "#FFFFFF", border: "none", borderRadius: 12, padding: "16px 18px", animation: "slideUp 0.3s ease both", boxShadow: "0 1px 4px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03)" },
+      bookCard: { background: "#FFFEF9", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 12, padding: "16px 18px", animation: "slideUp 0.3s ease both" },
       bookTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 },
       bookInfo: { flex: 1, paddingRight: 12 },
-      bookTitle: { fontFamily: "'Libre Baskerville', serif", fontSize: 16, fontWeight: 400, color: "#1C1917", lineHeight: 1.35 },
+      bookTitle: { fontFamily: "'Cormorant Garamond', serif", fontSize: 16, fontWeight: 400, color: "#1C1917", lineHeight: 1.35 },
       bookAuthor: { fontSize: 13, color: "#A8A29E", fontStyle: "italic" },
       authorRow: { display: "flex", alignItems: "center", gap: 8, marginTop: 2 },
       platformTagInline: { fontSize: 10, fontWeight: 500, padding: "1px 7px", borderRadius: 10, border: "1px solid", letterSpacing: "0.02em", whiteSpace: "nowrap" },
@@ -1194,33 +1192,33 @@
       progressTag: { fontSize: 11, color: "#78716C", background: "#F5F3F0", padding: "3px 9px", borderRadius: 16, fontWeight: 500 },
       dateTag: { fontSize: 11, color: "#A8A29E", marginLeft: "auto" },
       moveRow: { display: "flex", gap: 4, paddingTop: 10, borderTop: "1px solid #F0EDE8" },
-      moveBtn: { flex: 1, padding: "6px 0", background: "transparent", border: "1px solid #E7E2DC", borderRadius: 7, color: "#78716C", fontSize: 11, fontFamily: "'Outfit', sans-serif", fontWeight: 500, cursor: "pointer", transition: "all 0.15s" },
+      moveBtn: { flex: 1, padding: "6px 0", background: "transparent", border: "1px solid #DDD8D0", borderRadius: 7, color: "#78716C", fontSize: 11, fontFamily: "'Karla', sans-serif", fontWeight: 500, cursor: "pointer", transition: "all 0.15s" },
       moveBtnFinish: { borderColor: "#BBF7D0", color: "#166534", background: "#F0FDF4" },
       empty: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "56px 20px", color: "#A8A29E" },
       emptyIcon: { fontSize: 36, marginBottom: 6 },
-      emptyTitle: { fontFamily: "'Libre Baskerville', serif", fontSize: 17, color: "#78716C" },
+      emptyTitle: { fontFamily: "'Cormorant Garamond', serif", fontSize: 17, color: "#78716C" },
       emptyHint: { fontSize: 13, color: "#A8A29E" },
-      fab: { position: "fixed", bottom: 28, right: 24, width: 52, height: 52, borderRadius: "50%", background: "#C2785C", border: "none", color: "#FFFFFF", fontSize: 26, fontWeight: 300, cursor: "pointer", boxShadow: "0 2px 12px rgba(194, 120, 92, 0.3)", display: "flex", alignItems: "center", justifyContent: "center", transition: "transform 0.2s, box-shadow 0.2s", zIndex: 100 },
-      overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.2)", backdropFilter: "blur(6px)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200, animation: "fadeIn 0.2s ease" },
-      modal: { background: "#FFFFFF", border: "1px solid #E7E2DC", borderRadius: "18px 18px 0 0", padding: "22px 22px 30px", width: "100%", maxWidth: 560, maxHeight: "85vh", overflow: "auto", animation: "slideUp 0.3s ease", boxShadow: "0 -4px 24px rgba(0,0,0,0.08)" },
+      fab: { position: "fixed", bottom: 28, right: 24, width: 52, height: 52, borderRadius: "50%", background: "#1A1917", border: "none", color: "#F7F5F0", fontSize: 26, fontWeight: 300, cursor: "pointer", boxShadow: "0 2px 12px rgba(26,25,23,0.25)", display: "flex", alignItems: "center", justifyContent: "center", transition: "transform 0.2s, box-shadow 0.2s", zIndex: 100 },
+      overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", backdropFilter: "blur(10px)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 200, animation: "fadeIn 0.2s ease" },
+      modal: { background: "#FFFEF9", border: "1px solid #DDD8D0", borderRadius: "20px 20px 0 0", padding: "22px 22px 30px", width: "100%", maxWidth: 560, maxHeight: "85vh", overflow: "auto", animation: "slideUp 0.3s ease", boxShadow: "0 -4px 24px rgba(0,0,0,0.08)" },
       modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 },
-      modalTitle: { fontFamily: "'Libre Baskerville', serif", fontSize: 20, fontWeight: 400, color: "#1C1917" },
+      modalTitle: { fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 400, color: "#1C1917" },
       modalClose: { background: "none", border: "none", color: "#A8A29E", fontSize: 22, cursor: "pointer", padding: "4px 8px" },
       formGroup: { marginBottom: 16 },
       formRow: { display: "flex", gap: 10, marginBottom: 16 },
-      label: { display: "block", fontSize: 11, fontWeight: 600, color: "#78716C", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 },
-      input: { width: "100%", padding: "10px 12px", background: "#F7F5F2", border: "1px solid #E7E2DC", borderRadius: 8, color: "#1C1917", fontSize: 14, fontFamily: "'Outfit', sans-serif" },
-      dateInput: { width: "100%", padding: "10px 12px", background: "#F7F5F2", border: "1px solid #E7E2DC", borderRadius: 8, color: "#1C1917", fontSize: 14, fontFamily: "'Outfit', sans-serif", colorScheme: "light" },
+      label: { display: "block", fontSize: 9, fontWeight: 400, color: "#A09B93", textTransform: "uppercase", letterSpacing: "2px", marginBottom: 6, fontFamily: "'IBM Plex Mono', monospace" },
+      input: { width: "100%", padding: "10px 12px", background: "#F7F5F0", border: "1px solid #DDD8D0", borderRadius: 8, color: "#1C1917", fontSize: 14, fontFamily: "'Karla', sans-serif" },
+      dateInput: { width: "100%", padding: "10px 12px", background: "#F7F5F0", border: "1px solid #DDD8D0", borderRadius: 8, color: "#1C1917", fontSize: 14, fontFamily: "'Karla', sans-serif", colorScheme: "light" },
       segmented: { display: "flex", gap: 4, flexWrap: "wrap" },
-      segBtn: { flex: 1, padding: "8px 10px", background: "#F7F5F2", border: "1px solid #E7E2DC", borderRadius: 7, color: "#A8A29E", fontSize: 12, fontFamily: "'Outfit', sans-serif", fontWeight: 500, cursor: "pointer", transition: "all 0.15s", whiteSpace: "nowrap", minWidth: "fit-content" },
-      segBtnActive: { background: "#FFFFFF", color: "#1C1917", borderColor: "#D4CFC8", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" },
-      submitBtn: { width: "100%", padding: "12px", background: "#C2785C", border: "none", borderRadius: 10, color: "#FFFFFF", fontSize: 14, fontFamily: "'Outfit', sans-serif", fontWeight: 600, cursor: "pointer", marginTop: 6, letterSpacing: "0.02em", transition: "opacity 0.2s" },
+      segBtn: { flex: 1, padding: "8px 10px", background: "#F7F5F0", border: "1px solid #DDD8D0", borderRadius: 7, color: "#A8A29E", fontSize: 12, fontFamily: "'Karla', sans-serif", fontWeight: 500, cursor: "pointer", transition: "all 0.15s", whiteSpace: "nowrap", minWidth: "fit-content" },
+      segBtnActive: { background: "#FFFEF9", color: "#1C1917", borderColor: "#D4CFC8", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" },
+      submitBtn: { width: "100%", padding: "12px", background: "#1A1917", border: "none", borderRadius: 6, color: "#F7F5F0", fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", fontWeight: 400, cursor: "pointer", marginTop: 6, letterSpacing: "1px", textTransform: "uppercase", transition: "opacity 0.2s" },
       bulkHint: { fontSize: 13, color: "#78716C", lineHeight: 1.5, marginBottom: 10 },
-      bulkExamples: { background: "#F7F5F2", border: "1px solid #E7E2DC", borderRadius: 8, padding: "10px 14px", marginBottom: 18, display: "flex", flexDirection: "column", gap: 3 },
+      bulkExamples: { background: "#F7F5F0", border: "1px solid #DDD8D0", borderRadius: 8, padding: "10px 14px", marginBottom: 18, display: "flex", flexDirection: "column", gap: 3 },
       bulkExampleLine: { fontSize: 12, color: "#A8A29E", fontFamily: "monospace", lineHeight: 1.5 },
-      bulkExampleLabel: { fontSize: 10, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, fontFamily: "'Outfit', sans-serif", marginBottom: 2 },
-      bulkTextarea: { width: "100%", padding: "10px 12px", background: "#F7F5F2", border: "1px solid #E7E2DC", borderRadius: 8, color: "#1C1917", fontSize: 14, fontFamily: "'Outfit', sans-serif", resize: "vertical", minHeight: 130, lineHeight: 1.5 },
-      bulkPreviewList: { background: "#F7F5F2", border: "1px solid #E7E2DC", borderRadius: 8, padding: 6, maxHeight: 160, overflow: "auto" },
+      bulkExampleLabel: { fontSize: 10, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, fontFamily: "'Karla', sans-serif", marginBottom: 2 },
+      bulkTextarea: { width: "100%", padding: "10px 12px", background: "#F7F5F0", border: "1px solid #DDD8D0", borderRadius: 8, color: "#1C1917", fontSize: 14, fontFamily: "'Karla', sans-serif", resize: "vertical", minHeight: 130, lineHeight: 1.5 },
+      bulkPreviewList: { background: "#F7F5F0", border: "1px solid #DDD8D0", borderRadius: 8, padding: 6, maxHeight: 160, overflow: "auto" },
       bulkPreviewItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 10px", borderRadius: 6, gap: 8 },
       bulkPreviewTitle: { fontSize: 13, color: "#1C1917", fontWeight: 500 },
       bulkPreviewAuthor: { fontSize: 12, color: "#A8A29E", fontStyle: "italic", textAlign: "right", flexShrink: 0 },
@@ -1228,34 +1226,34 @@
       swipeContainer: { position: "relative", overflow: "hidden", borderRadius: 8 },
       swipeAction: { position: "absolute", right: 0, top: 0, bottom: 0, width: 120, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, color: "#166534", fontWeight: 500, fontSize: 12, transition: "background 0.15s" },
       swipeHint: { fontSize: 11, color: "#A8A29E", textAlign: "center", padding: "5px 0 3px", letterSpacing: "0.03em" },
-      urlCard: { display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: "#F7F5F2", borderRadius: 10, border: "1px solid #E7E2DC", margin: 6 },
-      urlCardIcon: { fontSize: 20, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", background: "#FFFFFF", borderRadius: 8, flexShrink: 0 },
+      urlCard: { display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: "#F7F5F0", borderRadius: 10, border: "1px solid #DDD8D0", margin: 6 },
+      urlCardIcon: { fontSize: 20, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", background: "#FFFEF9", borderRadius: 8, flexShrink: 0 },
       urlCardContent: { flex: 1, minWidth: 0 },
       urlCardLabel: { fontSize: 10, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 2 },
       urlCardTitle: { fontSize: 14, color: "#1C1917", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-      urlSaveBtn: { padding: "7px 14px", background: "#C2785C", border: "none", borderRadius: 8, color: "#FFFFFF", fontSize: 13, fontFamily: "'Outfit', sans-serif", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 },
-      quickAddBtn: { marginTop: 10, padding: "9px 16px", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, color: "#166534", fontSize: 13, fontFamily: "'Outfit', sans-serif", fontWeight: 500, cursor: "pointer", transition: "all 0.15s", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-      toast: { position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)", padding: "10px 18px", borderRadius: 10, border: "1px solid", fontSize: 13, fontWeight: 500, fontFamily: "'Outfit', sans-serif", zIndex: 300, animation: "slideUp 0.3s ease", boxShadow: "0 4px 16px rgba(0,0,0,0.08)", whiteSpace: "nowrap", maxWidth: "90vw", overflow: "hidden", textOverflow: "ellipsis" },
+      urlSaveBtn: { padding: "7px 14px", background: "#C2785C", border: "none", borderRadius: 8, color: "#FFFFFF", fontSize: 13, fontFamily: "'Karla', sans-serif", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 },
+      quickAddBtn: { marginTop: 10, padding: "9px 16px", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, color: "#166534", fontSize: 13, fontFamily: "'Karla', sans-serif", fontWeight: 500, cursor: "pointer", transition: "all 0.15s", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+      toast: { position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)", padding: "10px 18px", borderRadius: 10, border: "1px solid", fontSize: 13, fontWeight: 500, fontFamily: "'Karla', sans-serif", zIndex: 300, animation: "slideUp 0.3s ease", boxShadow: "0 4px 16px rgba(0,0,0,0.08)", whiteSpace: "nowrap", maxWidth: "90vw", overflow: "hidden", textOverflow: "ellipsis" },
       readCheckBanner: { display: "flex", alignItems: "flex-start", gap: 12, padding: "14px 16px", margin: "6px 6px 4px", background: "#ECFDF5", border: "1px solid #BBF7D0", borderRadius: 10, animation: "slideUp 0.25s ease" },
       readCheckIcon: { width: 36, height: 36, borderRadius: 18, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, background: "#D1FAE5", color: "#166534", flexShrink: 0 },
       readCheckContent: { flex: 1, minWidth: 0 },
-      readCheckTitle: { fontSize: 14, fontWeight: 600, color: "#166534", fontFamily: "'Outfit', sans-serif", marginBottom: 3 },
+      readCheckTitle: { fontSize: 14, fontWeight: 600, color: "#166534", fontFamily: "'Karla', sans-serif", marginBottom: 3 },
       readCheckBooks: { fontSize: 13, color: "#78716C", lineHeight: 1.5, display: "flex", flexDirection: "column", gap: 2 },
-      readCheckBookName: { fontFamily: "'Libre Baskerville', serif", fontStyle: "italic", fontSize: 13, color: "#57534E" },
+      readCheckBookName: { fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 13, color: "#57534E" },
       tagSelector: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 },
-      tagChip: { padding: "5px 10px", background: "#F7F5F2", border: "1px solid #E7E2DC", borderRadius: 14, color: "#78716C", fontSize: 11, fontFamily: "'Outfit', sans-serif", fontWeight: 500, cursor: "pointer", transition: "all 0.15s", whiteSpace: "nowrap" },
+      tagChip: { padding: "5px 10px", background: "#F7F5F0", border: "1px solid #DDD8D0", borderRadius: 14, color: "#78716C", fontSize: 11, fontFamily: "'Karla', sans-serif", fontWeight: 500, cursor: "pointer", transition: "all 0.15s", whiteSpace: "nowrap" },
       tagChipActive: { background: "#C2785C18", color: "#C2785C", borderColor: "#C2785C40" },
       tagChipCustom: { background: "#F0F4FF", borderColor: "#D0DBFF", color: "#4A6FA5" },
       tagChipCustomActive: { background: "#4A6FA520", color: "#4A6FA5", borderColor: "#4A6FA560" },
       customTagRow: { display: "flex", gap: 6, alignItems: "center", marginTop: 6 },
       customTagAddBtn: { width: 34, height: 34, borderRadius: 8, background: "#C2785C", border: "none", color: "#FFFFFF", fontSize: 18, fontWeight: 300, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
-      genreTag: { fontSize: 10, fontWeight: 500, padding: "2px 8px", borderRadius: 12, background: "#C2785C12", color: "#C2785C", border: "1px solid #C2785C25" },
+      genreTag: { fontSize: 10, fontWeight: 400, padding: "2px 8px", borderRadius: 12, background: "#8C857A12", color: "#8C857A", border: "1px solid #8C857A25", fontFamily: "'IBM Plex Mono', monospace", letterSpacing: "0.5px" },
       coverImg: { width: 56, height: 84, objectFit: "cover", borderRadius: 6, flexShrink: 0, marginRight: 14, boxShadow: "0 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06)" },
       coverPreview: { width: 60, height: 90, objectFit: "cover", borderRadius: 6, marginTop: 8, boxShadow: "0 1px 4px rgba(0,0,0,0.1)" },
       synopsisCollapsed: { padding: "6px 0 0", cursor: "pointer", display: "flex", alignItems: "baseline", gap: 4 },
-      synopsisExpanded: { padding: "8px 10px", marginTop: 6, cursor: "pointer", background: "#F7F5F2", borderRadius: 8, display: "flex", flexDirection: "column", gap: 4 },
+      synopsisExpanded: { padding: "8px 10px", marginTop: 6, cursor: "pointer", background: "#F7F5F0", borderRadius: 8, display: "flex", flexDirection: "column", gap: 4 },
       synopsisText: { fontSize: 11, color: "#A8A29E", lineHeight: 1.45 },
-      synopsisToggle: { fontSize: 10, color: "#C2785C", fontWeight: 600, flexShrink: 0, letterSpacing: "0.02em" },
+      synopsisToggle: { fontSize: 10, color: "#8C857A", fontWeight: 500, flexShrink: 0, letterSpacing: "0.02em" },
     };
 
     ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(BookTracker));
