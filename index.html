@@ -670,12 +670,6 @@
               <h1 style={S.logo}>bookshelf</h1>
             </div>
             <div style={S.stats}>
-              <span style={S.statItem}><span style={S.statNum}>{books.reading.length}</span> active</span>
-              <span style={S.statDivider}>·</span>
-              <span style={S.statItem}><span style={S.statNum}>{books.finished.length}</span> finished</span>
-              <span style={S.statDivider}>·</span>
-              <span style={S.statItem}><span style={S.statNum}>{books.want.length}</span> queued</span>
-              <span style={S.statDivider}>·</span>
               <button style={S.dataBtn} onClick={exportLibrary} title="Export backup">Export</button>
               <button style={S.dataBtn} onClick={importLibrary} title="Import backup">Import</button>
               <button style={S.dataBtn} onClick={importSynopses} title="Import synopses JSON">Synopses</button>
@@ -1150,7 +1144,7 @@
 
     // ── Styles ──
     const S = {
-      container: { fontFamily: "'Outfit', sans-serif", background: "#F7F5F2", minHeight: "100vh", color: "#44403C", padding: "28px 24px 100px", maxWidth: 560, margin: "0 auto" },
+      container: { fontFamily: "'Outfit', sans-serif", background: "#F7F5F2", minHeight: "100vh", color: "#44403C", padding: "28px 24px 100px", maxWidth: 800, margin: "0 auto" },
       header: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 24, paddingBottom: 16, borderBottom: "1px solid #E7E2DC" },
       headerLeft: { display: "flex", flexDirection: "column", gap: 2 },
       logo: { fontFamily: "'Libre Baskerville', serif", fontSize: 30, fontWeight: 400, color: "#1C1917", letterSpacing: "-0.01em", lineHeight: 1 },
